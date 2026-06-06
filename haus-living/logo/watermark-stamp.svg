@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <!-- Watermark: Corner stamp for product photos -->
+  <!-- Semi-transparent, bottom-right corner placement -->
+  
+  <!-- HL monogram large -->
+  <text x="150" y="130" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="100" font-weight="bold" fill="#D4A574" opacity="0.15" letter-spacing="-2">HL</text>
+  
+  <!-- HAUS LIVING -->
+  <text x="150" y="195" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="32" letter-spacing="8" fill="#D4A574" opacity="0.12">HAUS</text>
+  <text x="150" y="230" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="20" letter-spacing="8" fill="#D4A574" opacity="0.10">LIVING</text>
+  
+  <!-- Small decorative line -->
+  <line x1="100" y1="248" x2="200" y2="248" stroke="#D4A574" stroke-width="0.5" opacity="0.08"/>
+</svg>

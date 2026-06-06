@@ -1,0 +1,32 @@
+# Secrets & sensitive files
+*.env
+.env*
+wallets.enc
+*.key
+*.pem
+*.secret
+secrets/
+
+# Large binary files
+*.tar.gz
+*.zip
+*.mp4
+*.mp3
+*.wav
+
+# Node modules
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+logs/
+*.log
+
+# Temp files
+*.tmp
+*.temp
+/tmp/

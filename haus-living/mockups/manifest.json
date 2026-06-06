@@ -1,0 +1,38 @@
+[
+  {
+    "name": "sofa-living-room",
+    "path": "/home/ubuntu/.hermes/haus-living/mockups/sofa-living-room.jpg",
+    "size": 0,
+    "status": "failed"
+  },
+  {
+    "name": "dining-set-warm",
+    "path": "/home/ubuntu/.hermes/haus-living/mockups/dining-set-warm.jpg",
+    "size": 0,
+    "status": "failed"
+  },
+  {
+    "name": "bedroom-cozy",
+    "path": "/home/ubuntu/.hermes/haus-living/mockups/bedroom-cozy.jpg",
+    "size": 0,
+    "status": "failed"
+  },
+  {
+    "name": "tv-unit-floating",
+    "path": "/home/ubuntu/.hermes/haus-living/mockups/tv-unit-floating.jpg",
+    "size": 0,
+    "status": "failed"
+  },
+  {
+    "name": "desk-wfh-setup",
+    "path": "/home/ubuntu/.hermes/haus-living/mockups/desk-wfh-setup.jpg",
+    "size": 0,
+    "status": "failed"
+  },
+  {
+    "name": "reading-nook",
+    "path": "/home/ubuntu/.hermes/haus-living/mockups/reading-nook.jpg",
+    "size": 0,
+    "status": "failed"
+  }
+]

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#1C1C1C"/>
+      <stop offset="100%" style="stop-color:#0D0D0D"/>
+    </linearGradient>
+    <linearGradient id="honey" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#C4735B"/>
+      <stop offset="50%" style="stop-color:#D4A574"/>
+      <stop offset="100%" style="stop-color:#C4735B"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1080" height="1080" fill="url(#bg2)" rx="40"/>
+  
+  <!-- Monogram HL -->
+  <text x="540" y="480" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="340" font-weight="bold" fill="none" stroke="url(#honey)" stroke-width="4" letter-spacing="-10">HL</text>
+  
+  <!-- Haus -->
+  <text x="540" y="640" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="100" letter-spacing="24" fill="url(#honey)">HAUS</text>
+  
+  <!-- Elegant divider -->
+  <g transform="translate(540, 670)" opacity="0.7">
+    <line x1="-180" y1="0" x2="-20" y2="0" stroke="#D4A574" stroke-width="1.5"/>
+    <circle cx="0" cy="0" r="4" fill="#D4A574"/>
+    <line x1="20" y1="0" x2="180" y2="0" stroke="#D4A574" stroke-width="1.5"/>
+  </g>
+  
+  <!-- Living -->
+  <text x="540" y="740" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="60" letter-spacing="22" fill="#D4A574" opacity="0.8">LIVING</text>
+  
+  <!-- Subtle wood grain lines -->
+  <g opacity="0.04" stroke="#D4A574" stroke-width="1">
+    <line x1="0" y1="200" x2="1080" y2="200"/>
+    <line x1="0" y1="880" x2="1080" y2="880"/>
+    <line x1="200" y1="0" x2="200" y2="1080"/>
+    <line x1="880" y1="0" x2="880" y2="1080"/>
+  </g>
+</svg>

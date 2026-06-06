@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2C2C2C"/>
+      <stop offset="100%" style="stop-color:#1A1A1A"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#D4A574"/>
+      <stop offset="100%" style="stop-color:#C4735B"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1080" height="1080" fill="url(#bg3)" rx="40"/>
+  
+  <!-- Minimalist sofa icon -->
+  <g transform="translate(540, 320)">
+    <!-- Sofa back -->
+    <path d="M-140,-60 Q-140,-100 -100,-100 L100,-100 Q140,-100 140,-60 L140,0 L-140,0 Z" 
+          fill="none" stroke="url(#warm)" stroke-width="6"/>
+    <!-- Sofa seat -->
+    <rect x="-160" y="0" width="320" height="50" rx="8" fill="none" stroke="url(#warm)" stroke-width="6"/>
+    <!-- Left arm -->
+    <path d="M-160,-40 Q-180,-40 -180,-10 L-180,50 Q-180,70 -160,70 L-160,0" 
+          fill="none" stroke="url(#warm)" stroke-width="6"/>
+    <!-- Right arm -->
+    <path d="M160,-40 Q180,-40 180,-10 L180,50 Q180,70 160,70 L160,0" 
+          fill="none" stroke="url(#warm)" stroke-width="6"/>
+    <!-- Legs -->
+    <line x1="-130" y1="50" x2="-130" y2="80" stroke="url(#warm)" stroke-width="5"/>
+    <line x1="130" y1="50" x2="130" y2="80" stroke="url(#warm)" stroke-width="5"/>
+    <!-- Cushion lines -->
+    <line x1="-50" y1="-80" x2="-50" y2="-5" stroke="url(#warm)" stroke-width="3" opacity="0.4"/>
+    <line x1="50" y1="-80" x2="50" y2="-5" stroke="url(#warm)" stroke-width="3" opacity="0.4"/>
+  </g>
+  
+  <!-- HAUS LIVING text -->
+  <text x="540" y="570" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="110" letter-spacing="16" fill="url(#warm)">HAUS</text>
+  
+  <text x="540" y="660" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="70" letter-spacing="26" fill="#D4A574" opacity="0.85">LIVING</text>
+  
+  <!-- Decorative line -->
+  <g transform="translate(540, 700)" opacity="0.5">
+    <line x1="-120" y1="0" x2="120" y2="0" stroke="#D4A574" stroke-width="1"/>
+    <rect x="-3" y="-3" width="6" height="6" fill="#D4A574" transform="rotate(45)"/>
+  </g>
+  
+  <!-- Tagline -->
+  <text x="540" y="760" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-size="18" letter-spacing="8" fill="#D4A574" opacity="0.45">DARK MODERN FURNITURE</text>
+  
+  <!-- IG handle -->
+  <text x="540" y="950" text-anchor="middle" font-family="'Courier New', monospace" font-size="24" letter-spacing="4" fill="#D4A574" opacity="0.35">@haus_living1</text>
+</svg>

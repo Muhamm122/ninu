@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haus Living — IG Feed Demo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Playfair+Display:ital@1&display=swap');
+
+:root {
+  --bg: #0a0a0b;
+  --card: #161617;
+  --border: #2a2a2c;
+  --text: #e8e4df;
+  --text-dim: #8a8680;
+  --accent: #D4A574;
+  --terracotta: #C4735B;
+  --sage: #A8B5A0;
+  --cream: #F5EDE3;
+  --charcoal: #2C2C2C;
+  --warm-white: #FAF7F2;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* Top Nav */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,10,11,0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+.topbar-inner {
+  max-width: 975px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+}
+
+.brand {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 20px; font-weight: 700; letter-spacing: -0.5px;
+}
+
+.brand-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--terracotta));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+
+.nav-tabs {
+  display: flex; gap: 8px;
+}
+
+.nav-tab {
+  padding: 6px 16px; border-radius: 20px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s;
+  background: transparent; color: var(--text-dim); border: 1px solid transparent;
+}
+
+.nav-tab:hover { color: var(--text); }
+
+.nav-tab.active {
+  background: var(--accent); color: #1a1a18; border-color: var(--accent);
+}
+
+/* Profile Header */
+.profile-header {
+  max-width: 975px; margin: 0 auto; padding: 28px 20px 20px;
+  display: flex; align-items: center; gap: 24px;
+}
+
+.profile-pic {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: linear-gradient(135deg, #1A1A1C, #2C2C2C);
+  border: 3px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: var(--accent); flex-shrink: 0;
+}
+
+.profile-info { flex: 1; }
+
+.profile-name {
+  font-size: 22px; font-weight: 700; margin-bottom: 2px;
+}
+
+.profile-handle { color: var(--text-dim); font-size: 14px; }
+
+.profile-bio {
+  margin-top: 6px; font-size: 14px; color: var(--text);
+  max-width: 400px;
+}
+
+.profile-stats {
+  display: flex; gap: 28px; margin-top: 8px;
+}
+
+.stat { text-align: center; }
+
+.stat-num { font-size: 17px; font-weight: 700; }
+
+.stat-label { font-size: 12px; color: var(--text-dim); }
+
+/* Grid / Feed Toggle */
+.view-toggle {
+  max-width: 975px; margin: 0 auto; padding: 0 20px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: center; gap: 20px;
+  padding-top: 10px; padding-bottom: 4px;
+}
+
+.view-btn {
+  background: none; border: none; color: var(--text-dim);
+  font-size: 20px; cursor: pointer; padding: 4px 8px; transition: 0.2s;
+}
+
+.view-btn.active { color: var(--text); }
+
+/* Feed */
+.feed {
+  max-width: 975px; margin: 0 auto; padding: 0 20px 40px;
+}
+
+/* Post Card */
+.post-card {
+  background: var(--card); border-radius: 16px;
+  margin-bottom: 20px; overflow: hidden;
+  border: 1px solid var(--border);
+  opacity: 0; transform: translateY(20px);
+  animation: fadeUp 0.5s ease forwards;
+}
+
+.post-card:nth-child(1) { animation-delay: 0.05s; }
+.post-card:nth-child(2) { animation-delay: 0.1s; }
+.post-card:nth-child(3) { animation-delay: 0.15s; }
+.post-card:nth-child(4) { animation-delay: 0.2s; }
+.post-card:nth-child(5) { animation-delay: 0.25s; }
+.post-card:nth-child(6) { animation-delay: 0.3s; }
+.post-card:nth-child(7) { animation-delay: 0.35s; }
+.post-card:nth-child(8) { animation-delay: 0.4s; }
+.post-card:nth-child(9) { animation-delay: 0.45s; }
+.post-card:nth-child(10) { animation-delay: 0.5s; }
+
+@keyframes fadeUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Post Header */
+.post-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+}
+
+.post-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, #1A1A1C, #2C2C2C);
+  border: 2px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: var(--accent);
+}
+
+.post-user { font-size: 14px; font-weight: 600; }
+
+.post-type-badge {
+  margin-left: auto;
+  padding: 3px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+.badge-product { background: rgba(212,165,116,0.15); color: var(--accent); }
+.badge-carousel { background: rgba(168,181,160,0.15); color: var(--sage); }
+.badge-reel { background: rgba(196,115,91,0.15); color: var(--terracotta); }
+.badge-lifestyle { background: rgba(212,165,116,0.1); color: var(--accent); }
+.badge-trust { background: rgba(168,181,160,0.1); color: var(--sage); }
+
+/* Image Area */
+.post-image {
+  width: 100%; aspect-ratio: 4/5;
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.post-image.carousel-img { aspect-ratio: 4/5; }
+
+.img-placeholder {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  position: relative;
+}
+
+.img-placeholder .product-emoji {
+  font-size: 80px; margin-bottom: 12px;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+}
+
+.img-placeholder .product-label {
+  font-size: 14px; color: rgba(255,255,255,0.5);
+  font-weight: 500; letter-spacing: 1px; text-transform: uppercase;
+}
+
+/* Carousel indicator */
+.carousel-dots {
+  position: absolute; bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 6px;
+}
+
+.carousel-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+}
+
+.carousel-dot.active { background: #fff; }
+
+/* Slide overlay */
+.slide-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  padding: 40px; text-align: center;
+  background: rgba(10,10,11,0.7);
+}
+
+.slide-overlay h2 {
+  font-size: 22px; font-weight: 700;
+  margin-bottom: 12px; color: #fff;
+  max-width: 320px;
+}
+
+.slide-overlay p {
+  font-size: 15px; color: var(--cream);
+  max-width: 300px;
+}
+
+.slide-number {
+  position: absolute; top: 16px; right: 16px;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: #fff;
+}
+
+/* Reel badge */
+.reel-badge {
+  position: absolute; top: 16px; left: 16px;
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; color: #fff;
+  background: rgba(0,0,0,0.5); padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.reel-badge::before { content: '▶'; font-size: 10px; }
+
+/* Product tag on image */
+.product-tag {
+  position: absolute; bottom: 20px; left: 20px;
+  background: rgba(26,26,28,0.85); backdrop-filter: blur(8px);
+  padding: 8px 16px; border-radius: 8px;
+  border: 1px solid var(--accent);
+}
+
+.product-tag .tag-name {
+  font-size: 13px; font-weight: 600; color: var(--accent);
+}
+
+.product-tag .tag-price {
+  font-family: 'Playfair Display', serif;
+  font-style: italic; font-size: 16px; color: #fff;
+  margin-top: 2px;
+}
+
+/* Actions */
+.post-actions {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 16px;
+}
+
+.action-btn {
+  background: none; border: none; color: var(--text);
+  font-size: 22px; cursor: pointer; transition: 0.15s;
+  padding: 2px;
+}
+
+.action-btn:hover { transform: scale(1.1); }
+
+.action-btn.liked { color: #ed4956; }
+
+.action-spacer { flex: 1; }
+
+.likes-count {
+  padding: 0 16px;
+  font-size: 13px; font-weight: 600;
+}
+
+/* Caption */
+.post-caption {
+  padding: 4px 16px 16px;
+  font-size: 14px; line-height: 1.55;
+}
+
+.caption-username { font-weight: 600; margin-right: 4px; }
+
+.caption-text { color: var(--text); white-space: pre-line; }
+
+.caption-text .price {
+  font-family: 'Playfair Display', serif;
+  font-style: italic; color: var(--accent);
+}
+
+.caption-text .cta {
+  color: var(--accent); font-weight: 600;
+}
+
+.hashtags {
+  color: #5ea4d4; font-size: 13px;
+  word-wrap: break-word; margin-top: 6px;
+  line-height: 1.6;
+}
+
+.post-time {
+  font-size: 11px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.3px;
+  margin-top: 6px;
+}
+
+/* Image backgrounds */
+.bg-sofa { background: linear-gradient(135deg, #2C2418 0%, #3D3329 30%, #1A1A18 70%, #2C2418 100%); }
+.bg-cream { background: linear-gradient(135deg, #F5EDE3 0%, #FAF7F2 50%, #D4B896 100%); }
+.bg-warm { background: linear-gradient(135deg, #D4A574 0%, #C4735B 50%, #8B6F4E 100%); }
+.bg-cool { background: linear-gradient(135deg, #1A1A18 0%, #2C2C2C 40%, #3D3329 100%); }
+.bg-sage { background: linear-gradient(135deg, #A8B5A0 0%, #8B6F4E 50%, #1A1A18 100%); }
+.bg-terracotta { background: linear-gradient(135deg, #C4735B 0%, #D4A574 50%, #FAF7F2 100%); }
+.bg-dark-wood { background: linear-gradient(160deg, #3D3329 0%, #2C2418 30%, #1A1A18 60%, #0a0a0b 100%); }
+.bg-workspace { background: linear-gradient(135deg, #2C2C2C 0%, #1A1A18 40%, #A8B5A0 100%); }
+.bg-craftsman { background: linear-gradient(135deg, #8B6F4E 0%, #3D3329 50%, #1A1A18 100%); }
+.bg-testimonial { background: linear-gradient(135deg, #FAF7F2 0%, #F5EDE3 50%, #D4B896 100%); }
+
+/* Mobile */
+@media (max-width: 600px) {
+  .profile-header { flex-direction: column; text-align: center; gap: 16px; }
+  .profile-stats { justify-content: center; }
+  .profile-bio { max-width: 100%; }
+  .nav-tabs { display: none; }
+  .post-card { border-radius: 12px; }
+  .img-placeholder .product-emoji { font-size: 60px; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* Footer */
+.demo-footer {
+  text-align: center; padding: 30px 20px;
+  color: var(--text-dim); font-size: 13px;
+  border-top: 1px solid var(--border);
+}
+
+.demo-footer strong { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-icon">H</div>
+      <span>Haus Living Demo</span>
+    </div>
+    <div class="nav-tabs">
+      <div class="nav-tab active">Feed</div>
+      <div class="nav-tab">Reels</div>
+      <div class="nav-tab">Story</div>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Header -->
+<div class="profile-header">
+  <div class="profile-pic">H</div>
+  <div class="profile-info">
+    <div class="profile-name">Haus Living</div>
+    <div class="profile-handle">@hausliving</div>
+    <div class="profile-bio">Furniture yang ngerti rumah lo 🏡 Handcrafted modern minimal furniture — premium tapi accessible.</div>
+    <div class="profile-stats">
+      <div class="stat"><div class="stat-num">2,847</div><div class="stat-label">Posts</div></div>
+      <div class="stat"><div class="stat-num">12.4K</div><div class="stat-label">Followers</div></div>
+      <div class="stat"><div class="stat-num">389</div><div class="stat-label">Following</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Feed -->
+<div class="feed">
+
+  <!-- POST 1: Sofa L-Shape -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-product">Product</div>
+    </div>
+    <div class="post-image">
+      <div class="img-placeholder bg-sofa">
+        <div class="product-emoji">🛋️</div>
+        <div class="product-label">Sofa L-Shape — Warm Wood Setting</div>
+        <div class="product-tag">
+          <div class="tag-name">Sofa L-Shape</div>
+          <div class="tag-price">Rp 3.500.000</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">342 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">Ruang tamu lo deserve lebih dari sofa biasa.
+
+Sofa L-Shape Haus Living:
+• Frame solid teak wood — bukan MDF, bukan partikel board
+• Foam D32 high-density — duduk 5 tahun tetap empuk
+• Fabric stain-resistant — tumpahan kopi? Lap aja hilang
+• Modular — lebar kiri/kanan bisa swap sesuai ruang
+
+Mulai <span class="price">Rp 3.500.000</span>
+Garansi 5 tahun 🤝
+
+<span class="cta">DM "SOFA L" untuk swatch fabric + ukuran 👆</span></span>
+      <div class="hashtags">#hausliving #sofalshape #sofaminimalis #ruangtamuimpian #furniturejati #interiordesign #livingroomdecor #mebeljakarta</div>
+      <div class="post-time">2 hours ago</div>
+    </div>
+  </div>
+
+  <!-- POST 2: Carousel Tips Sofa -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-carousel">Carousel</div>
+    </div>
+    <div class="post-image carousel-img">
+      <div class="img-placeholder bg-warm">
+        <div class="slide-overlay">
+          <div class="slide-number">1/5</div>
+          <h2>5 kesalahan beli sofa yang bikin menyesal 1 tahun kemudian</h2>
+          <p>Swipe untuk lihat semuanya →</p>
+        </div>
+      </div>
+      <div class="carousel-dots">
+        <div class="carousel-dot active"></div>
+        <div class="carousel-dot"></div>
+        <div class="carousel-dot"></div>
+        <div class="carousel-dot"></div>
+        <div class="carousel-dot"></div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">891 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">5 kesalahan beli sofa yang bikin menyesal 1 tahun kemudian
+
+❌ Beli tanpa ukur ruangan
+❌ Milih busa super empuk (kropos 6 bulan!)
+❌ Frame MDF (2 tahun miring)
+❌ Lupa cek lebar pintu
+❌ Ga tanya density busa
+
+Save buat reminder pas lo beli sofa nanti 📌</span>
+      <div class="hashtags">#hausliving #tipsfurniture #sofaminimalis #furnitureindonesia #interiordesign #homeinspo #tipsrumah</div>
+      <div class="post-time">5 hours ago</div>
+    </div>
+  </div>
+
+  <!-- POST 3: Meja Makan -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-lifestyle">Lifestyle</div>
+    </div>
+    <div class="post-image">
+      <div class="img-placeholder bg-cream">
+        <div class="product-emoji">🪑</div>
+        <div class="product-label">Meja Makan 6 Seater — Dinner Setting</div>
+        <div class="product-tag">
+          <div class="tag-name">Meja Makan 6 Seater</div>
+          <div class="tag-price">Rp 3.500.000</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">278 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">Makan malam keluarga bukan cuma soal makanan.
+
+Meja makan yang pas bikin orang betah duduk sampe dessert.
+Yang bikin conversation mengalir tanpa nunggu HP mati.
+
+Meja Makan 6 Seater Haus Living:
+• Solid teak wood — grain natural
+• Extendable option — 4→8 seater dalam 1 tarikan
+• Italian ceramic marble top available
+
+Mulai <span class="price">Rp 3.500.000</span>
+
+<span class="cta">DM "MEJA MAKAN" buat pilihan wood finish 👆</span></span>
+      <div class="hashtags">#hausliving #mejamakan #diningset #diningroomdecor #furniturejati #homeinspo</div>
+      <div class="post-time">1 day ago</div>
+    </div>
+  </div>
+
+  <!-- POST 4: Reel Rak TV -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-reel">Reel</div>
+    </div>
+    <div class="post-image" style="aspect-ratio: 9/16;">
+      <div class="img-placeholder bg-cool">
+        <div class="reel-badge">Reel · 15s</div>
+        <div class="product-emoji">📺</div>
+        <div class="product-label">Rak TV Floating — Time-lapse Install</div>
+        <div class="product-tag">
+          <div class="tag-name">Rak TV Floating 160cm</div>
+          <div class="tag-price">Rp 1.200.000</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">1,204 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">Floating TV rack = ruang tamu kelihatan 2x luas.
+
+Kenapa?
+→ Lantai kosong di bawah = ilusi space
+→ Kabel hidden = clean aesthetic
+→ Wall-mounted = ga makan floor space
+
+Mulai <span class="price">Rp 1.200.000</span>
+
+<span class="cta">DM "RAK TV" buat konsultasi ukuran 👆</span></span>
+      <div class="hashtags">#hausliving #raktv #tvunit #floatingshelf #ruangtamuimpian #interiordesign</div>
+      <div class="post-time">2 days ago</div>
+    </div>
+  </div>
+
+  <!-- POST 5: Bed Frame -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-product">Product</div>
+    </div>
+    <div class="post-image">
+      <div class="img-placeholder bg-dark-wood">
+        <div class="product-emoji">🛏️</div>
+        <div class="product-label">Bed Frame Hydraulic — Storage Open</div>
+        <div class="product-tag">
+          <div class="tag-name">Bed Frame Hydraulic</div>
+          <div class="tag-price">Rp 2.500.000</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">456 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">Kamar tidur sempit = ga bisa simpen barang?
+
+Salah. Pilih bed frame yang bener aja.
+
+Bed Frame Hydraulic Haus Living:
+✅ Lift-up mechanism — storage seukuran kasur
+✅ 60cm depth storage — muat bed cover, bantal, seasonal
+✅ Gas strut premium — buka tutup satu tangan
+✅ Solid wood frame — ga kresek, ga miring
+
+Mulai <span class="price">Rp 2.500.000</span>
+
+<span class="cta">DM "BED FRAME" buat katalog 👆</span></span>
+      <div class="hashtags">#hausliving #bedframe #kamartidur #kamarminimalis #storagefurniture #furniturejati</div>
+      <div class="post-time">3 days ago</div>
+    </div>
+  </div>
+
+  <!-- POST 6: Bundle Carousel -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-carousel">Bundle</div>
+    </div>
+    <div class="post-image carousel-img">
+      <div class="img-placeholder bg-sage">
+        <div class="slide-overlay">
+          <div class="slide-number">1/4</div>
+          <h2>Ruang tamu SETANAK sebulan — cuma 1 klik</h2>
+          <p style="margin-top:8px;font-size:20px;color:#D4A574;font-style:italic;font-family:'Playfair Display',serif">Rp 4.900.000 — hemat Rp 600rb</p>
+        </div>
+      </div>
+      <div class="carousel-dots">
+        <div class="carousel-dot active"></div>
+        <div class="carousel-dot"></div>
+        <div class="carousel-dot"></div>
+        <div class="carousel-dot"></div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">567 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">Sofa L + Rak TV + Ottoman = 1 ruang tamu lengkap
+
+• Sofa L-Shape (Rp 3.500.000)
+• Rak TV Floating 160cm (Rp 1.500.000)
+• Ottoman Footrest (Rp 500.000)
+
+<span class="price">BUNDLE: Rp 4.900.000 — HEMAT Rp 600.000! 💰</span>
+
+Free delivery Jabodetabek
+Garansi 5 tahun semua item
+
+<span class="cta">DM "BUNDLE TAMU" 👆</span></span>
+      <div class="hashtags">#hausliving #ruangtamuset #bundlemurah #sofalshape #raktv #furniturejati #promofurniture</div>
+      <div class="post-time">4 days ago</div>
+    </div>
+  </div>
+
+  <!-- POST 7: Sofa Bed -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-product">Product</div>
+    </div>
+    <div class="post-image">
+      <div class="img-placeholder bg-terracotta">
+        <div style="display:flex;gap:40px;align-items:center;">
+          <div style="text-align:center;">
+            <div style="font-size:60px;">☀️</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-top:4px;">SIANG</div>
+            <div style="font-size:40px;">🛋️</div>
+          </div>
+          <div style="font-size:30px;color:rgba(255,255,255,0.4);">→</div>
+          <div style="text-align:center;">
+            <div style="font-size:60px;">🌙</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-top:4px;">MALAM</div>
+            <div style="font-size:40px;">🛏️</div>
+          </div>
+        </div>
+        <div class="product-label" style="margin-top:20px;">Sofa Bed — Day ↔ Night Mode</div>
+        <div class="product-tag">
+          <div class="tag-name">Sofa Bed</div>
+          <div class="tag-price">Rp 2.800.000</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">312 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">Siang: sofa buat nonton Netflix.
+Malam: bed buat tidur nyenyak.
+
+Sofa Bed Haus Living = 2 fungsi, 1 furniture, 0 kompromi.
+
+• Click-clack mechanism — ganti mode 3 detik
+• Foam dual density — dudukan firm + sandaran plush
+• Cover removable — bisa cuci
+
+Mulai <span class="price">Rp 2.800.000</span>
+
+<span class="cta">DM "SOFA BED" 👆</span></span>
+      <div class="hashtags">#hausliving #sofabed #sofaminimalis #apartmentfurniture #smallspacesolution</div>
+      <div class="post-time">5 days ago</div>
+    </div>
+  </div>
+
+  <!-- POST 8: Behind the Scene -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-lifestyle">BTS</div>
+    </div>
+    <div class="post-image">
+      <div class="img-placeholder bg-craftsman">
+        <div style="font-size:24px;color:rgba(255,255,255,0.3);letter-spacing:4px;text-transform:uppercase;margin-bottom:16px;">Behind The Scene</div>
+        <div class="product-emoji">🪵</div>
+        <div style="font-size:16px;color:var(--cream);margin-top:12px;font-style:italic;max-width:280px;text-align:center;">Setiap grain kayu beda. Setiap joint dijamin kuat.</div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">634 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">Kayu jati ini uda tua sebelum sofa lo jadi.
+
+Ini bukan furniture yang di-production-line 10.000 unit.
+Ini kayu solid yang dipilih, diukir, dirakit sama tangan yang uda 15 tahun di bidang.
+
+Setiap grain kayu beda.
+Setiap joint dijamin kuat.
+Setiap sofa punya cerita.
+
+Itu yang bikin Haus Living bukan sekedar mebel — ini furniture yang ngerti rumah lo.</span>
+      <div class="hashtags">#hausliving #handmade #craftsmanship #furniturejati #handcrafted #solidwood #tanganindonesia #lokalmade #supportlocal</div>
+      <div class="post-time">6 days ago</div>
+    </div>
+  </div>
+
+  <!-- POST 9: Meja Kerja -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-product">Product</div>
+    </div>
+    <div class="post-image">
+      <div class="img-placeholder bg-workspace">
+        <div class="product-emoji">🖥️</div>
+        <div class="product-label">Meja Kerja L-Shape — WFH Setup</div>
+        <div class="product-tag">
+          <div class="tag-name">Meja Kerja L-Shape</div>
+          <div class="tag-price">Rp 1.500.000</div>
+        </div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">198 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">WFH setup lo menentukan produktivitas lo.
+
+Meja Kerja L-Shape Haus Living:
+• 140×80 + 80×50 wing — space ganda
+• Cable tray built-in — kabel rapi
+• Solid wood top — mouse pad ga perlu
+• Height 75cm / adjustable standing
+
+Mulai <span class="price">Rp 1.500.000</span>
+
+<span class="cta">DM "MEJA KERJA" 👆</span></span>
+      <div class="hashtags">#hausliving #mejakerja #homeoffice #wfhsetup #desksetup #workfromhome #furniturejati</div>
+      <div class="post-time">1 week ago</div>
+    </div>
+  </div>
+
+  <!-- POST 10: Testimoni -->
+  <div class="post-card">
+    <div class="post-header">
+      <div class="post-avatar">H</div>
+      <div class="post-user">hausliving</div>
+      <div class="post-type-badge badge-trust">Testimoni</div>
+    </div>
+    <div class="post-image">
+      <div class="img-placeholder bg-testimonial">
+        <div style="font-size:60px;filter:grayscale(0);opacity:0.9;">⭐</div>
+        <div style="font-size:48px;color:#2C2C2C;font-weight:700;margin-top:8px;">4.9/5</div>
+        <div style="font-size:14px;color:#8a8680;margin-top:16px;max-width:300px;text-align:center;font-style:italic;">"Seneng banget sama sofa nya... 1 tahun uda, masih empuk dan ga berubah sama sekali. Worth every rupiah!"</div>
+        <div style="font-size:12px;color:#8a8680;margin-top:8px;">— Mbak Rina, Bintaro</div>
+      </div>
+    </div>
+    <div class="post-actions">
+      <button class="action-btn">♡</button>
+      <button class="action-btn">💬</button>
+      <button class="action-btn">📤</button>
+      <div class="action-spacer"></div>
+      <button class="action-btn">🔖</button>
+    </div>
+    <div class="likes-count">723 likes</div>
+    <div class="post-caption">
+      <span class="caption-username">hausliving</span>
+      <span class="caption-text">"Seneng banget sama sofa nya, bahannya enak, warnanya sesuai, dan yang paling penting suami saya juga suka hahaha. 1 tahun uda, masih empuk dan ga berubah sama sekali. Worth every rupiah!"
+— Mbak Rina, Bintaro
+
+✅ 5 tahun garansi
+✅ Free delivery Jabodetabek
+✅ 100+ customer satisfied
+✅ Review 4.9/5
+
+<span class="cta">DM "KATALOG" buat mulai 👆</span></span>
+      <div class="hashtags">#hausliving #testimoni #reviewfurniture #furniturejati #sofaberkualitas #customerreview #worthit</div>
+      <div class="post-time">1 week ago</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="demo-footer">
+  <strong>Haus Living</strong> — IG Feed Demo v1.0<br>
+  10 post siap copy-paste · Generated by SUPERAGENT v4.1<br>
+  <span style="margin-top:8px;display:inline-block;">🏠 furniture yang ngerti rumah lo</span>
+</div>
+
+<script>
+// Like button toggle
+document.querySelectorAll('.action-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    if (this.textContent === '♡') {
+      this.textContent = '♥';
+      this.classList.add('liked');
+      // Update likes count
+      const card = this.closest('.post-card');
+      const likesEl = card.querySelector('.likes-count');
+      if (likesEl) {
+        const num = parseInt(likesEl.textContent.replace(/,/g, ''));
+        likesEl.textContent = (num + 1).toLocaleString() + ' likes';
+      }
+    } else if (this.textContent === '♥') {
+      this.textContent = '♡';
+      this.classList.remove('liked');
+      const card = this.closest('.post-card');
+      const likesEl = card.querySelector('.likes-count');
+      if (likesEl) {
+        const num = parseInt(likesEl.textContent.replace(/,/g, ''));
+        likesEl.textContent = (num - 1).toLocaleString() + ' likes';
+      }
+    }
+  });
+});
+</script>
+</body>
+</html>

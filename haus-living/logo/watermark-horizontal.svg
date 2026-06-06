@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+  <!-- Watermark: Haus Living — for product catalog overlay -->
+  <!-- Transparent background, gold text -->
+  
+  <!-- HL monogram -->
+  <text x="30" y="140" font-family="Georgia, 'Times New Roman', serif" font-size="120" font-weight="bold" fill="#D4A574" opacity="0.9" letter-spacing="-4">HL</text>
+  
+  <!-- Divider -->
+  <line x1="195" y1="60" x2="195" y2="140" stroke="#D4A574" stroke-width="1.5" opacity="0.4"/>
+  
+  <!-- HAUS LIVING text -->
+  <text x="220" y="95" font-family="Georgia, 'Times New Roman', serif" font-size="46" letter-spacing="10" fill="#D4A574" opacity="0.85">HAUS</text>
+  <text x="220" y="140" font-family="Georgia, 'Times New Roman', serif" font-size="28" letter-spacing="12" fill="#D4A574" opacity="0.65">LIVING</text>
+  
+  <!-- Small house accent -->
+  <g transform="translate(220, 155)" opacity="0.35">
+    <polygon points="0,-5 -6,0 6,0" fill="#D4A574"/>
+    <rect x="-4" y="0" width="8" height="5" fill="#D4A574"/>
+  </g>
+</svg>
