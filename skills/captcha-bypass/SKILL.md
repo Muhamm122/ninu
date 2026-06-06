@@ -71,13 +71,33 @@ grep -o 'sitekey.*\"' page.js              # Turnstile
 5. No CAPTCHA triggered during signup (as of 2026-06-06)
 6. Phone verification likely at password step
 
-### Pitfalls
-| Error | Fix |
-|-------|-----|
-| `Unable to handle challenge` | Pakai `playwright_stealth_get()` |
-| `ERROR_ZERO_BALANCE` | Top up 2captcha.com |
-| `ProxyError` | Cek PROXY_URL format |
-| Partial birthday error | Must fill Month + Day + Year |
+## PEMBEDAKAN KEY (penting!)
+- `fe_oa_...` = FreeLLMAPI key → pake untuk FreeLLMAPI endpoint (127.0.0.1:3001) saja
+- OpenRouter key ada di `.env` tapi dimask `***` — agent TIDAK BISA extract key asli
+- Kalo butuh OpenRouter key, user harus set manual via SSH
+- JANGAN kirim API keys di chat group — security risk
+
+## Free Models Available (Tested 2026-06-06)
+All via FreeLLMAPI (port 3001) with key prefix `fe_oa_`:
+- `qwen3-coder:480b` — ⭐⭐⭐⭐⭐ best for coding
+- `deepseek-v4-flash-free` — ⭐⭐⭐⭐⭐ reasoning
+- `nemotron-3-super-free` — ⭐⭐⭐⭐ general
+- `mimo-v2.5-free` — ⭐⭐⭐⭐ MiMo variant
+- `@cf/moonshotai/kimi-k2.6` — ⭐⭐⭐⭐ Kimi
+
+## AWS IP Limitations (reinforced)
+- Google reCAPTCHA: BLOCKED (datacenter IP) — even with cloudscraper
+- Cloudflare: kadang bypassable pake cloudscraper, kadang perlu Playwright
+- Gmail signup: kadang jalan, kadang di-reset Google
+- X/Twitter signup: need phone verification + residential IP
+- SOLUSI: residential proxy atau user manual dari HP
+
+## User Setup Pattern
+Kalo user ga paham teknis:
+1. Kasih panduan step-by-step (F12 instructions)
+2. JANGAN extract password/token dari user
+3. User yang set sendiri via SSH
+4. Token/keys jangan dikirim di chat group
 | Username taken | Try variations with numbers/suffixes |
 
 ## Tips

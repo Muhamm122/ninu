@@ -1,79 +1,39 @@
-# USER.md — Owner Profile (v3)
-# Auto-injected every session. EDIT BEFORE FIRST RUN.
-
----
+# USER.md — Operator Profile
 
 ## Identity
+- **Name:** CUPANG BALAP
+- **Call sign:** CUPANG
+- **Role:** Operator / Builder / Creator
 
-Name:           [YOUR NAME]
-Honorific:      [Kakak / Bos / Mas / Bro / your-preferred-form-of-address]
-Language:       [Indonesian / English / Mixed]
-Level:          [beginner / intermediate / expert]
-Tone:           [casual / formal / no-nonsense]
-Timezone:       [WIB / UTC+7 / your-tz]
-Location:       [Jakarta / city]
+## Communication
+- **Language:** Indonesian (Bahasa Indonesia)
+- **Style:** Casual lo/gue, direct, no fluff
+- **Tone:** Operator-to-operator, fast execution
 
----
+## Preferences
+- **Direct execution** — "gas", "jalankan", "lanjut" = execute immediately
+- **No repetition** — don't re-explain known blockers
+- **No moralizing** — no disclaimers, no lecturing
+- **No password sharing** — never accept passwords via chat
+- **File paths** — reference by path, never paste contents of secrets
 
-## Operating Context
+## Anti-preferences
+- Jangan tanya berkali-kali
+- Jangan disclaimer panjang
+- Jangan repeat blockers yang udah diketahui
+- Jangan sa tanpa offering alternative
 
-Active projects:
-- [project-name] — [status: planning / building / shipped / maintenance] — [stack: node/py/...]
-- [project-name] — [status] — [stack]
+## Environment
+- **Server:** AWS Singapore (18.143.107.30)
+- **VPS IP:** Datacenter (Google/Meta blocked sans residential proxy)
+- **SUPERAGENT:** v4.1 — 37 skills, 30 tools
 
-Stack preferences:
-- Server:    [Ubuntu 22.04 / Debian / other]
-- Runtime:   [Node.js v20 / Python 3.11 / both]
-- Process:   [pm2 / systemd / screen / tmux]
-- DB:        [postgres / mysql / sqlite / redis]
-- Payment:   [Midtrans / Stripe / crypto]
-- Bot:       [Telegram / Discord / WhatsApp]
+## Security
+- Never accept passwords via chat
+- Never store credentials in plain text
+- All secrets stored encrypted, referenced by path only
+- When blocked/pivoting, do NOT try to complete the abandoned task
 
-API keys available (just yes/no — don't paste keys here):
-- Anthropic: [yes/no]
-- OpenRouter: [yes/no]
-- Kimi/Moonshot: [yes/no]
-- DeepSeek: [yes/no]
-- Groq: [yes/no]
-
----
-
-## Domain Focus (pick all that apply)
-
-- [ ] Crypto / Web3
-- [ ] Content creation
-- [ ] SaaS / digital products
-- [ ] Service / consulting
-- [ ] E-commerce
-- [ ] AI tools / automation
-- [ ] Other: ___
-
----
-
-## Trigger Phrases (operator → agent shortcuts)
-
-```
-"go" / "gas" / "lanjut"        → execute without confirmation
-"upgrade" / "improve"          → return better version of last output
-"audit" / "review"             → run x1 (self-audit)
-"debug" / "gak jalan"          → run x3 (diagnose)
-"strategize" / "kasih plan"    → run x2 (deep thinking)
-"fast"                         → fast mode (short answer)
-"deep" / "elaborate"           → deep mode (full analysis)
-```
-
----
-
-## Always Remember
-
-- [thing 1 — e.g., "default ke postgres, jangan saranin mysql"]
-- [thing 2 — e.g., "kerjaan utama gue crypto airdrop content"]
-- [thing 3 — e.g., "kalo bilang 'gas' = run, don't ask"]
-
----
-
-## Anti-preferences (don't do this)
-
-- [thing 1 — e.g., "jangan tanya berkali-kali, satu ronde aja"]
-- [thing 2 — e.g., "jangan kasih disclaimer panjang"]
-- [thing 3 — e.g., "jangan recommend tools yang gak free tier"]
+## Corrections
+- If corrected, update memory immediately
+- Don't repeat the same mistake

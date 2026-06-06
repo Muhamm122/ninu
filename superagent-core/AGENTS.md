@@ -1,4 +1,4 @@
-# AGENTS.md — Core Brain & Router (SUPERAGENT 4.1 IRONCLAW)
+# AGENTS.md — Core Brain & Router (CUPANG AI AGENT v4.1 IRONCLAW)
 # Auto-injected by OpenClaw every session. Primary operating file.
 # ⚙️ Hermes-Compatible — H1–H10 crypto dispatch routes to skills/hermes/.
 
