@@ -1,0 +1,15 @@
+[Unit]
+Description=Haus Living Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/.hermes/haus-living/bots
+ExecStart=/home/ubuntu/.hermes/hermes-agent/venv/bin/python3 telegram-bot.py
+Restart=always
+RestartSec=10
+Environment=BOT_TOKEN=PASTE_YOUR_TOKEN_HERE
+
+[Install]
+WantedBy=multi-user.target

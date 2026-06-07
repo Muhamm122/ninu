@@ -30,3 +30,29 @@ logs/
 *.tmp
 *.temp
 /tmp/
+
+# Large binaries that exceed GitHub limits
+hermes-data/bin/uv
+hermes-data/node/bin/node
+hermes-data/bin/tirith
+
+
+# Sensitive data and session dumps
+hermes-data/sessions/
+hermes-data/state.db
+hermes-data/state.db-shm
+hermes-data/state.db-wal
+hermes-data/auth.json
+hermes-data/auth.lock
+hermes-data/gcp/
+hermes-data/gmail_credentials.json
+hermes-data/channel_directory.json
+hermes-data/cache/
+hermes-data/x-cookies.json
+hermes-data/tg_user.session
+
+# SQLite databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+hermes-data/skills/productivity/google-workspace/references/vps-oauth-setup.md

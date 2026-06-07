@@ -303,6 +303,8 @@ Note: for chains with millions of events, chunk by block range (e.g., 10k blocks
 
 ## Solana Quick Reference
 
+### JavaScript (@solana/web3.js)
+
 ```javascript
 const { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } = require('@solana/web3.js');
 const bs58 = require('bs58');
@@ -324,7 +326,65 @@ const sig = await connection.sendTransaction(tx, [payer]);
 console.log('Sig:', sig);
 ```
 
+### Python (solders) — Wallet Generation
+
+Install: `pip install solders base58`
+
+```python
+from solders.keypair import Keypair
+import base58, json
+
+# Generate single wallet
+kp = Keypair()
+pubkey = str(kp.pubkey())        # ⚠️ METHOD CALL, not property! .pubkey() not .pubkey
+secret_bytes = bytes(kp)         # 64-byte secret (NOT kp.secret_key — doesn't exist)
+secret_b58 = base58.b58encode(secret_bytes).decode()
+
+# Batch generate
+wallets = []
+for i in range(N):
+    kp = Keypair()
+    wallets.append({
+        'id': i + 1,
+        'public_key': str(kp.pubkey()),
+        'secret_base58': base58.b58encode(bytes(kp)).decode()
+    })
+
+with open('sol-wallets.json', 'w') as f:
+    json.dump(wallets, f, indent=2)
+```
+
+**⚠️ solders API Pitfalls (Python)**
+- `.pubkey` is a **method**, not a property → must call `kp.pubkey()` with parens. `str(kp.pubkey)` returns `<built-in method ...>` not the address!
+- `.secret_key` does **NOT exist** on Keypair. Use `bytes(kp)` for the 64-byte secret.
+- `.secret` exists but returns a different format — `bytes(kp)` is the canonical 64-byte representation compatible with `Keypair.from_bytes()`.
+- For JSON storage: encode secret as base58 string via `base58.b58encode(bytes(kp)).decode()`.
+- Restore from base58: `kp = Keypair.from_bytes(base58.b58decode(secret_b58))`.
+
+### Solana JSON-RPC (curl / requests — no SDK needed)
+
+```bash
+# Check SOL balance
+curl -s https://api.mainnet-beta.solana.com -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getBalance","params":["WALLET_PUBKEY"]}' | python3 -m json.tool
+
+# Check SPL token account
+curl -s https://api.mainnet-beta.solana.com -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenAccountsByOwner","params":["WALLET_PUBKEY",{"mint":"TOKEN_MINT"},{"encoding":"jsonParsed"}]}' | python3 -m json.tool
+
+# Request airdrop (devnet/testnet only, 1 SOL max)
+curl -s https://api.devnet.solana.com -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"requestAirdrop","params":["WALLET_PUBKEY",1000000000]}'
+```
+
 ---
+
+## Airdrop Research
+
+See `references/airdrop-research-pattern.md` for the full investigative workflow: API discovery via browser performance entries, stats/status inspection, anti-sybil analysis, pool status decision framework, and registration flow patterns. Includes pimp.zone case study.
 
 ## On-Chain Common Patterns
 

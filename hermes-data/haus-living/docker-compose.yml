@@ -1,0 +1,90 @@
+# Haus Living — Full Stack Docker Compose
+# ~/.hermes/haus-living/docker-compose.yml
+
+version: "3.8"
+
+services:
+  # === API / Webhook Server ===
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: haus-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY:-placeholder}
+      - XENDIT_CALLBACK_TOKEN=${XENDIT_CALLBACK_TOKEN:-}
+      - IG_VERIFY_TOKEN=${IG_VERIFY_TOKEN:-haus_living_verify}
+      - IG_APP_SECRET=${IG_APP_SECRET:-}
+      - HAUS_WEBHOOK_DIR=/data/webhooks
+    volumes:
+      - ./data/webhooks:/data/webhooks
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/webhook/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # === n8n Workflow Automation ===
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: haus-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-hausliving2024}
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - GENERIC_TIMEZONE=Asia/Jakarta
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # === Redis (for session cache + rate limit) ===
+  redis:
+    image: redis:7-alpine
+    container_name: haus-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # === PostgreSQL (for orders + analytics) ===
+  postgres:
+    image: postgres:16-alpine
+    container_name: haus-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=hausliving
+      - POSTGRES_USER=haus
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-hausliving2024}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U haus"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  default:
+    name: haus-living

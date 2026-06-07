@@ -1,0 +1,34 @@
+{
+  "providers": [
+    {
+      "name": "iproyal",
+      "server": "gw.iproyal.com:12321",
+      "username": "YOUR_IPROYAL_USER",
+      "password": "YOUR_IPROYAL_PASS",
+      "geo_support": true,
+      "protocol": "http"
+    },
+    {
+      "name": "smartproxy",
+      "server": "gw.smartproxy.com:7000",
+      "username": "YOUR_SMARTPROXY_USER",
+      "password": "YOUR_SMARTPROXY_PASS",
+      "geo_support": true,
+      "protocol": "http"
+    }
+  ],
+  "defaults": {
+    "geo": "id",
+    "rotation": "per-session",
+    "failover": true
+  },
+  "geo_map": {
+    "google": "id",
+    "gmail": "id",
+    "stripe": "us",
+    "pioneer": "us",
+    "dapp": "us",
+    "ethereum": "us",
+    "solana": "us"
+  }
+}

@@ -1,0 +1,21 @@
+[
+  {
+    "session_id": "proc_36dd88c031b4",
+    "command": "cloudflared tunnel --url http://localhost:8089",
+    "pid": 26480,
+    "pid_scope": "host",
+    "cwd": "/home/ubuntu",
+    "started_at": 1780793353.6777363,
+    "task_id": "default",
+    "session_key": "agent:main:telegram:dm:439901712",
+    "watcher_platform": "",
+    "watcher_chat_id": "",
+    "watcher_user_id": "",
+    "watcher_user_name": "",
+    "watcher_thread_id": "",
+    "watcher_message_id": "",
+    "watcher_interval": 0,
+    "notify_on_complete": false,
+    "watch_patterns": []
+  }
+]

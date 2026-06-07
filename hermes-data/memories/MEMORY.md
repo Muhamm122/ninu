@@ -1,0 +1,11 @@
+2026-06-06: CUPANG AI AGENT rebrand — SOUL.md, USER.md, IDENTITY.md, AGENTS.md updated. Owner: CUPANG BALAP. Focus: Web3, airdrop, mining, NFT WL, snipers, CC gen. GitHub auto-sync setup. Captcha-bypass installed. 6 free models tested. JKSE 52W low.
+§
+SUPERAGENT v4.1. 37skills+30tools. FreeLLMAPI:3001 (102 models), OpenCode:19912 (45 models). IG:@haus_living1. 5 cron jobs — ALL pinned openrouter/owl-alpha (null→"Stealth"→400 error). Stack: Nginx, Docker/n8n, FastAPI:8000 PM2, TG/Discord bots (need tokens), scraper. UFW hardened, logrotate, PM2 startup. Health monitor: systemd timer 6h. Backup: ~522MB verified.
+§
+Vinci World OTP login works from AWS IP (no CAPTCHA). OTP ~60s expiry, resend kills old code, refs expire fast. Web3/OTP sites generally work from datacenter. SCTG solver integrated (balance $0, needs top up). NVIDIA NIM connected to 9Router (qwen3-coder, deepseek-v4, kimi-k2.6 work; nemotron=403 enterprise). captcha-bypass skill updated with OTP flow section + Vinci World reference.
+§
+2026-06-06: MiMo V2.5 Pro primary, OpenRouter owl-alpha fallback, FreeLLMAPI:3001 last resort. 4 cron jobs pinned openrouter/owl-alpha. Health = systemd timer 6h. UFW (22/80/443). Backup 522MB. Watermark v2: 3 types × 2 variants. User interested in crypto/stock screening NOT trading. JKSE crashed to 52W low 5594. CAPTCHA: text/math OK, reCAPTCHA blocked (AWS IP).
+§
+Model fallback: MiMo V2.5 Pro → Qwen3 Coder 480B (freellmapi) → OpenRouter owl-alpha. Model locked per-session — must `/new` to switch. `/new` preserves all persistent data. Browser engine: cloakbrowser. 9Router v0.4.71 on port 20128, dashboard via CF tunnel, systemd service, providers: FreeLLMAPI+OpenRouter+NVIDIA NIM. NVIDIA NIM key added — working models: qwen3-coder-480b, deepseek-v4-flash, kimi-k2.6. Nemotron 3 Super = 403 (enterprise only).
+§
+Gmail adibmuhadi@gmail.com via IMAP/SMTP. X/Twitter @muhamm122 (ID:1205811165873332225) 108f/878fr/674t, cookies in ~/.hermes/x-cookies.json + x-actions/.env. Telegram @muhamm12 (ID:720985466) via Telethon. YesCaptcha $15. Tools: gmail.py, tg_user.py, x_tool.py, captcha.py. SCTG=$0.

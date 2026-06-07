@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haus Living — Furniture yang Ngerti Rumah Lo</title>
+    <meta name="description" content="Modern minimalist furniture handcrafted with love. Sofa, meja makan, kamar tidur, dan lainnya — dibuat buat rumah lo.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        warm: { 50:'#FAF7F2', 100:'#F5EDE3', 200:'#E8D9C5', 300:'#D4B896' },
+                        charcoal: '#2C2C2C',
+                        terra: '#C4735B',
+                        sage: '#A8B5A0',
+                        honey: '#D4A574',
+                        walnut: '#8B6F4E',
+                        oak: '#D4B896',
+                    },
+                    fontFamily: {
+                        sans: ['DM Sans', 'Inter', 'system-ui', 'sans-serif'],
+                        display: ['Playfair Display', 'Georgia', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+    <style>
+        * { scroll-behavior: smooth; }
+        body { font-family: 'DM Sans', sans-serif; }
+        .playfair { font-family: 'Playfair Display', serif; }
+        .fade-in { animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+        .product-card:hover .product-img { transform: scale(1.05); }
+        .product-img { transition: transform 0.3s ease; }
+        .wa-float { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(37,211,102,0.4); } 50% { box-shadow: 0 0 0 12px rgba(37,211,102,0); } }
+    </style>
+</head>
+<body class="bg-warm-50 text-charcoal">
+
+    <!-- ========== NAVBAR ========== -->
+    <nav class="fixed top-0 w-full z-50 bg-warm-50/90 backdrop-blur-md border-b border-warm-200/50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="#" class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-charcoal rounded-lg flex items-center justify-center">
+                    <span class="text-warm-50 font-bold text-sm">HL</span>
+                </div>
+                <span class="font-bold text-lg tracking-tight">Haus <span class="text-honey playfair italic">Living</span></span>
+            </a>
+            <div class="hidden md:flex items-center gap-6 text-sm font-medium">
+                <a href="#koleksi" class="hover:text-terra transition">Koleksi</a>
+                <a href="#tentang" class="hover:text-terra transition">Tentang</a>
+                <a href="#testimoni" class="hover:text-terra transition">Testimoni</a>
+                <a href="#kontak" class="hover:text-terra transition">Kontak</a>
+            </div>
+            <a href="https://wa.me/6281234567890?text=Halo%20Nana%20Furniart%2C%20saya%20mau%20tanya%20produk" target="_blank" class="bg-charcoal text-warm-50 px-4 py-2 rounded-lg text-sm font-medium hover:bg-charcoal/80 transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.051-.52.149-.049.199-.297.967-.361 1.042-.064.075-.26.114-.41.049-.149-.064-.762-.297-1.42-.597-.475-.222-1.033-.578-1.42-.842-.26-.188-.448-.499-.448-.842 0-.343.149-.683.448-.842.299-.149.89-.222 1.286-.049.396.173 1.42.842 1.781 1.054.361.222.52.297.621.248.099-.049.198-.149.297-.597.149-.89.222-1.19.273-1.29.049-.099.198-.222.52-.222z"/></svg>
+                WhatsApp
+            </a>
+        </div>
+    </nav>
+
+    <!-- ========== HERO ========== -->
+    <section class="pt-24 pb-16 md:pt-32 md:pb-24">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="grid md:grid-cols-2 gap-8 items-center">
+                <div class="fade-in">
+                    <p class="text-terra font-medium text-sm tracking-widest uppercase mb-4">Handcrafted Modern Furniture</p>
+                    <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+                        Furniture yang<br>
+                        <span class="playfair italic text-honey">ngerti</span> rumah lo
+                    </h1>
+                    <p class="text-charcoal/70 text-lg mb-8 leading-relaxed">
+                        Dibuat tangan dengan material terbaik, buat rumah yang bikin lo betah. Bukan furniture massal — ini furniture yang dibuat satu per satu.
+                    </p>
+                    <div class="flex flex-wrap gap-4">
+                        <a href="#koleksi" class="bg-charcoal text-warm-50 px-6 py-3 rounded-xl font-medium hover:bg-charcoal/80 transition">Lihat Koleksi</a>
+                        <a href="https://wa.me/6281234567890?text=Halo%20Nana%20Furniart%2C%20saya%20mau%20tanya%20produk" target="_blank" class="border-2 border-charcoal text-charcoal px-6 py-3 rounded-xl font-medium hover:bg-charcoal hover:text-warm-50 transition">Tanya Langsung</a>
+                    </div>
+                    <div class="flex items-center gap-6 mt-8 text-sm text-charcoal/60">
+                        <span class="flex items-center gap-2">✅ Garansi 5 Tahun</span>
+                        <span class="flex items-center gap-2">🚚 Free Delivery JKT</span>
+                    </div>
+                </div>
+                <div class="relative fade-in">
+                    <div class="aspect-[4/5] bg-warm-200 rounded-2xl overflow-hidden">
+                        <div class="w-full h-full bg-gradient-to-br from-warm-300 via-warm-200 to-warm-100 flex items-center justify-center">
+                            <div class="text-center p-8">
+                                <div class="text-6xl mb-4">🛋️</div>
+                                <p class="playfair italic text-walnut text-lg">Ruang tamu impian<br>dimulai dari sini</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="absolute -bottom-4 -left-4 bg-white rounded-xl p-4 shadow-lg">
+                        <p class="text-xs text-charcoal/50">Mulai dari</p>
+                        <p class="font-bold text-xl">Rp 1.8<span class="text-sm font-normal text-charcoal/50">jt</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== KENAPA KAMI ========== -->
+    <section class="py-16 bg-charcoal text-warm-50">
+        <div class="max-w-6xl mx-auto px-4">
+            <h2 class="text-2xl md:text-3xl font-bold text-center mb-12">Kenapa <span class="playfair italic text-honey">Haus Living</span>?</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="text-center">
+                    <div class="text-3xl mb-3">🤲</div>
+                    <h3 class="font-bold mb-1">Handcrafted</h3>
+                    <p class="text-warm-50/60 text-sm">Dibuat tangan, bukan mesin</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl mb-3">🪵</div>
+                    <h3 class="font-bold mb-1">Solid Wood</h3>
+                    <p class="text-warm-50/60 text-sm">Jati & oak asli, bukan MDF</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl mb-3">🛡️</div>
+                    <h3 class="font-bold mb-1">5 Tahun Garansi</h3>
+                    <p class="text-warm-50/60 text-sm">Kami yakin kualitas kami</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl mb-3">🚚</div>
+                    <h3 class="font-bold mb-1">Free Delivery</h3>
+                    <p class="text-warm-50/60 text-sm">Jabodetabek order >3jt</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== KOLEKSI ========== -->
+    <section id="koleksi" class="py-16 md:py-24">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="text-center mb-12">
+                <p class="text-terra font-medium text-sm tracking-widest uppercase mb-2">Koleksi Kami</p>
+                <h2 class="text-3xl md:text-4xl font-bold">Furniture buat setiap <span class="playfair italic text-honey">sudut</span> rumah</h2>
+            </div>
+
+            <!-- Category Tabs -->
+            <div class="flex flex-wrap justify-center gap-2 mb-8">
+                <button onclick="filterCat('semua')" class="cat-btn active bg-charcoal text-warm-50 px-4 py-2 rounded-lg text-sm font-medium transition" data-cat="semua">Semua</button>
+                <button onclick="filterCat('sofa')" class="cat-btn bg-warm-200 text-charcoal px-4 py-2 rounded-lg text-sm font-medium transition hover:bg-charcoal hover:text-warm-50" data-cat="sofa">Sofa</button>
+                <button onclick="filterCat('meja')" class="cat-btn bg-warm-200 text-charcoal px-4 py-2 rounded-lg text-sm font-medium transition hover:bg-charcoal hover:text-warm-50" data-cat="meja">Meja Makan</button>
+                <button onclick="filterCat('kamar')" class="cat-btn bg-warm-200 text-charcoal px-4 py-2 rounded-lg text-sm font-medium transition hover:bg-charcoal hover:text-warm-50" data-cat="kamar">Kamar Tidur</button>
+                <button onclick="filterCat('tv')" class="cat-btn bg-warm-200 text-charcoal px-4 py-2 rounded-lg text-sm font-medium transition hover:bg-charcoal hover:text-warm-50" data-cat="tv">Rak TV</button>
+                <button onclick="filterCat('kantor')" class="cat-btn bg-warm-200 text-charcoal px-4 py-2 rounded-lg text-sm font-medium transition hover:bg-charcoal hover:text-warm-50" data-cat="kantor">Meja Kerja</button>
+            </div>
+
+            <!-- Product Grid -->
+            <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+
+                <!-- SOFA -->
+                <div class="product-card group" data-category="sofa">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-warm-300 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">🛋️</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Sofa L-Shape</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">High-density foam D32</p>
+                    <p class="font-bold text-terra">Rp 3.500.000</p>
+                </div>
+
+                <div class="product-card group" data-category="sofa">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-warm-300 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">💺</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Sofa 3-Seater</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Solid frame + stain resistant</p>
+                    <p class="font-bold text-terra">Rp 2.500.000</p>
+                </div>
+
+                <div class="product-card group" data-category="sofa">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-warm-300 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">🛏️</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Sofa Bed</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Pull-out, multifungsi</p>
+                    <p class="font-bold text-terra">Rp 2.800.000</p>
+                </div>
+
+                <!-- MEJA MAKAN -->
+                <div class="product-card group" data-category="meja">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-walnut/30 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">🍽️</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Dining Set 4 Seater</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Solid oak + upholstered chair</p>
+                    <p class="font-bold text-terra">Rp 3.800.000</p>
+                </div>
+
+                <div class="product-card group" data-category="meja">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-walnut/30 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">🪑</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Dining Set 6 Seater</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Extendable, marble top option</p>
+                    <p class="font-bold text-terra">Rp 5.500.000</p>
+                </div>
+
+                <!-- KAMAR -->
+                <div class="product-card group" data-category="kamar">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-sage/30 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">🛏️</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Bed Frame + Storage</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Hydraulic lift, walnut finish</p>
+                    <p class="font-bold text-terra">Rp 2.500.000</p>
+                </div>
+
+                <div class="product-card group" data-category="kamar">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-sage/30 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">🗄️</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Wardrobe 3 Pintu</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Sliding, full hanging + drawer</p>
+                    <p class="font-bold text-terra">Rp 4.500.000</p>
+                </div>
+
+                <!-- RAK TV -->
+                <div class="product-card group" data-category="tv">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-charcoal/10 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">📺</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Rak TV Floating 160cm</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Hidden cable, LED strip</p>
+                    <p class="font-bold text-terra">Rp 1.550.000</p>
+                </div>
+
+                <!-- MEJA KERJA -->
+                <div class="product-card group" data-category="kantor">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-honey/30 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">💻</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Meja Kerja 120cm</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Cable hole, drawer, oak finish</p>
+                    <p class="font-bold text-terra">Rp 1.350.000</p>
+                </div>
+
+                <div class="product-card group" data-category="kantor">
+                    <div class="bg-warm-200 rounded-xl overflow-hidden aspect-[4/5] mb-3">
+                        <div class="product-img w-full h-full bg-gradient-to-br from-honey/30 to-warm-100 flex items-center justify-center">
+                            <span class="text-5xl">📚</span>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-sm md:text-base">Bookshelf 5 Tier</h3>
+                    <p class="text-charcoal/50 text-xs mb-1">Modular, solid oak</p>
+                    <p class="font-bold text-terra">Rp 1.200.000</p>
+                </div>
+
+            </div>
+
+            <div class="text-center mt-10">
+                <a href="https://wa.me/6281234567890?text=Halo%20Nana%20Furniart%2C%20saya%20mau%20lihat%20katalog%20lengkap" target="_blank" class="inline-flex items-center gap-2 bg-terra text-white px-6 py-3 rounded-xl font-medium hover:bg-terra/80 transition">
+                    Lihat Katalog Lengkap via WhatsApp
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== BUNDLE ========== -->
+    <section class="py-16 bg-warm-100">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="text-center mb-10">
+                <p class="text-terra font-medium text-sm tracking-widest uppercase mb-2">Hemat Lebih Banyak</p>
+                <h2 class="text-3xl font-bold">Bundle <span class="playfair italic text-honey">Set</span></h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition">
+                    <div class="text-3xl mb-2">🛋️</div>
+                    <h3 class="font-bold text-lg mb-1">Ruang Tamu Set</h3>
+                    <p class="text-charcoal/50 text-sm mb-3">Sofa L + Rak TV + Ottoman</p>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="line-through text-charcoal/40 text-sm">Rp 7.500.000</span>
+                        <span class="bg-terra/10 text-terra text-xs px-2 py-0.5 rounded font-medium">HEMAT 1jt</span>
+                    </div>
+                    <p class="font-bold text-2xl text-charcoal">Rp 6.500.000</p>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition border-2 border-terra">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="text-3xl">🍽️</div>
+                        <span class="bg-terra text-white text-xs px-2 py-0.5 rounded font-medium">POPULER</span>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Dining Set 6</h3>
+                    <p class="text-charcoal/50 text-sm mb-3">Meja + 6 Kursi Upholstered</p>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="line-through text-charcoal/40 text-sm">Rp 6.500.000</span>
+                        <span class="bg-terra/10 text-terra text-xs px-2 py-0.5 rounded font-medium">HEMAT 1jt</span>
+                    </div>
+                    <p class="font-bold text-2xl text-charcoal">Rp 5.500.000</p>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition">
+                    <div class="text-3xl mb-2">🛏️</div>
+                    <h3 class="font-bold text-lg mb-1">Bedroom Set</h3>
+                    <p class="text-charcoal/50 text-sm mb-3">Bed Frame + 2 Nakas + Dresser</p>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="line-through text-charcoal/40 text-sm">Rp 5.500.000</span>
+                        <span class="bg-terra/10 text-terra text-xs px-2 py-0.5 rounded font-medium">HEMAT 1jt</span>
+                    </div>
+                    <p class="font-bold text-2xl text-charcoal">Rp 4.500.000</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== TESTIMONI ========== -->
+    <section id="testimoni" class="py-16">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="text-center mb-10">
+                <p class="text-terra font-medium text-sm tracking-widest uppercase mb-2">Testimoni</p>
+                <h2 class="text-3xl font-bold">Kata yang uda <span class="playfair italic text-honey">percaya</span></h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-warm-100 rounded-2xl p-6">
+                    <div class="flex gap-1 mb-3">⭐⭐⭐⭐⭐</div>
+                    <p class="text-charcoal/70 mb-4 italic">"Sofa nya 3 bulan uda maseh bener-bener baru. Anak-anak lompat-lompat di atas, ga ada masalah."</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-terra/20 rounded-full flex items-center justify-center text-terra font-bold">R</div>
+                        <div>
+                            <p class="font-bold text-sm">Ibu Rina</p>
+                            <p class="text-charcoal/50 text-xs">Permata Hijau, Jakarta Selatan</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-warm-100 rounded-2xl p-6">
+                    <div class="flex gap-1 mb-3">⭐⭐⭐⭐⭐</div>
+                    <p class="text-charcoal/70 mb-4 italic">"Meja makannya solid banget, ga goyang. Kayu jatinya asli. Worth every rupiah!"</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-sage/30 rounded-full flex items-center justify-center text-sage font-bold">D</div>
+                        <div>
+                            <p class="font-bold text-sm">Pak Dian</p>
+                            <p class="text-charcoal/50 text-xs">BSD, Tangerang</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-warm-100 rounded-2xl p-6">
+                    <div class="flex gap-1 mb-3">⭐⭐⭐⭐⭐</div>
+                    <p class="text-charcoal/70 mb-4 italic">"Bed frame-nya storage-nya gede banget. Kamar jadi rapi. Delivery cepet, packaging aman."</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-honey/30 rounded-full flex items-center justify-center text-honey font-bold">A</div>
+                        <div>
+                            <p class="font-bold text-sm">Mbak Ayu</p>
+                            <p class="text-charcoal/50 text-xs">Kelapa Gading, Jakarta</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== TENTANG ========== -->
+    <section id="tentang" class="py-16 bg-charcoal text-warm-50">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h2 class="text-3xl font-bold mb-6">Tangan yang <span class="playfair italic text-honey">peduli</span></h2>
+                    <p class="text-warm-50/70 leading-relaxed mb-4">
+                        Setiap furniture Haus Living dibuat oleh tangan craftsman yang uda 15+ tahun di bidang ini. Ga ada mesin CNC, ga ada factory line.
+                    </p>
+                    <p class="text-warm-50/70 leading-relaxed mb-6">
+                        Cuma tangan, ketelitian, dan kebanggaan buat yang terbaik. Ini bukan furniture massal — ini furniture yang dibuat satu per satu, buat satu rumah pada satu waktu.
+                    </p>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <p class="text-3xl font-bold text-honey">15+</p>
+                            <p class="text-xs text-warm-50/50">Tahun Pengalaman</p>
+                        </div>
+                        <div>
+                            <p class="text-3xl font-bold text-honey">500+</p>
+                            <p class="text-xs text-warm-50/50">Unit Terjual</p>
+                        </div>
+                        <div>
+                            <p class="text-3xl font-bold text-honey">98%</p>
+                            <p class="text-xs text-warm-50/50">Customer Puas</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="aspect-square bg-warm-50/5 rounded-2xl flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="text-7xl mb-4">🤲🪵</div>
+                        <p class="playfair italic text-honey text-lg">Handmade with pride</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== CTA ========== -->
+    <section id="kontak" class="py-20">
+        <div class="max-w-3xl mx-auto px-4 text-center">
+            <h2 class="text-3xl md:text-4xl font-bold mb-4">Siap bikin rumah lo <span class="playfair italic text-honey">betah</span>?</h2>
+            <p class="text-charcoal/60 mb-8">Chat langsung via WhatsApp untuk katalog, harga, dan order. Kami respond cepat!</p>
+            <a href="https://wa.me/6281234567890?text=Halo%20Nana%20Furniart%2C%20saya%20mau%20tanya%20produk" target="_blank" class="inline-flex items-center gap-3 bg-[#25D366] text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-[#20BD5A] transition shadow-lg">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.051-.52.149-.049.199-.297.967-.361 1.042-.064.075-.26.114-.41.049-.149-.064-.762-.297-1.42-.597-.475-.222-1.033-.578-1.42-.842-.26-.188-.448-.499-.448-.842 0-.343.149-.683.448-.842.299-.149.89-.222 1.286-.049.396.173 1.42.842 1.781 1.054.361.222.52.297.621.248.099-.049.198-.149.297-.597.149-.89.222-1.19.273-1.29.049-.099.198-.222.52-.222z"/><path d="M12.05 2C6.525 2 2.05 6.475 2.05 12c0 1.89.525 3.66 1.44 5.18L2 22l4.94-1.29A9.96 9.96 0 0012.05 22C17.575 22 22.05 17.525 22.05 12S17.575 2 12.05 2zm0 18c-1.65 0-3.2-.45-4.54-1.24l-.33-.19-3.26.85.88-3.18-.22-.35A7.96 7.96 0 014.05 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z"/></svg>
+                Chat WhatsApp Sekarang
+            </a>
+            <p class="text-charcoal/40 text-sm mt-4">@haus_living1 • Jakarta, Indonesia</p>
+        </div>
+    </section>
+
+    <!-- ========== FOOTER ========== -->
+    <footer class="bg-charcoal text-warm-50/50 py-8">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 bg-warm-50/10 rounded flex items-center justify-center">
+                        <span class="text-warm-50 font-bold text-xs">HL</span>
+                    </div>
+                    <span class="text-sm">Haus Living © 2026</span>
+                </div>
+                <div class="flex gap-6 text-sm">
+                    <a href="#" class="hover:text-warm-50 transition">Instagram</a>
+                    <a href="#" class="hover:text-warm-50 transition">WhatsApp</a>
+                    <a href="#" class="hover:text-warm-50 transition">Tokopedia</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ========== FLOATING WA ========== -->
+    <a href="https://wa.me/6281234567890?text=Halo%20Nana%20Furniart%2C%20saya%20mau%20tanya%20produk" target="_blank" class="wa-float fixed bottom-6 right-6 z-50 w-14 h-14 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition">
+        <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.051-.52.149-.049.199-.297.967-.361 1.042-.064.075-.26.114-.41.049-.149-.064-.762-.297-1.42-.597-.475-.222-1.033-.578-1.42-.842-.26-.188-.448-.499-.448-.842 0-.343.149-.683.448-.842.299-.149.89-.222 1.286-.049.396.173 1.42.842 1.781 1.054.361.222.52.297.621.248.099-.049.198-.149.297-.597.149-.89.222-1.19.273-1.29.049-.099.198-.222.52-.222z"/><path d="M12.05 2C6.525 2 2.05 6.475 2.05 12c0 1.89.525 3.66 1.44 5.18L2 22l4.94-1.29A9.96 9.96 0 0012.05 22C17.575 22 22.05 17.525 22.05 12S17.575 2 12.05 2zm0 18c-1.65 0-3.2-.45-4.54-1.24l-.33-.19-3.26.85.88-3.18-.22-.35A7.96 7.96 0 014.05 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z"/></svg>
+    </a>
+
+    <!-- ========== SCRIPTS ========== -->
+    <script>
+        function filterCat(cat) {
+            const cards = document.querySelectorAll('.product-card');
+            const btns = document.querySelectorAll('.cat-btn');
+
+            btns.forEach(b => {
+                b.classList.remove('bg-charcoal', 'text-warm-50');
+                b.classList.add('bg-warm-200', 'text-charcoal');
+            });
+            const activeBtn = document.querySelector(`.cat-btn[data-cat="${cat}"]`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-warm-200', 'text-charcoal');
+                activeBtn.classList.add('bg-charcoal', 'text-warm-50');
+            }
+
+            cards.forEach(card => {
+                if (cat === 'semua' || card.dataset.category === cat) {
+                    card.style.display = '';
+                    card.classList.add('fade-in');
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>

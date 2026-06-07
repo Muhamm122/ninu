@@ -123,6 +123,28 @@ browser = await launch_persistent_context_async(
 5. Content creation (calendars, captions, style guides) does NOT need IG access
 ```
 
+### X/Twitter Account Creation
+```
+1. X signup form loads from datacenter IP (no CF block on page load)
+2. BUT: "Sign up with Phone" → enters phone → "Sorry, you are not allowed to log in at this time"
+3. Email signup redirects to "Get the app to finish signing up" with QR code
+4. X checks IP reputation DURING phone verification — hard block at that point
+5. No CAPTCHA presented — just a flat refusal
+6. Solution: residential proxy (Indonesia geo for +62 numbers)
+7. Post-creation: X cookies (auth_token + ct0) can be extracted for API use without proxy
+```
+
+### Gmail Account Creation
+```
+1. Google signup form loads fine from datacenter IP
+2. Name → Birthday → Gender → Username → Password — all steps reachable
+3. BUT: After password, "Sorry, we could not create your Google Account" — hard block
+4. No CAPTCHA — Google checks ASN/IP reputation and silently rejects datacenter IPs
+5. Even YesCaptcha cannot fix (no CAPTCHA to solve)
+6. Solution: residential proxy (Indonesia geo for Indonesian accounts)
+7. Alternative: user creates account manually on phone (1 min), then gives App Password for IMAP/SMTP access
+```
+
 ### Stripe
 ```
 1. ⚠️ Stripe BLOCKS many proxy IPs — test first
@@ -193,8 +215,11 @@ If user sends Google credentials for automated signup from a server, refuse and 
 - ❌ Not verifying proxy type (many "residential" are actually datacenter)
 - ❌ Not rotating session IDs — same IP gets flagged too
 - ❌ Attempting Google OAuth from AWS/GCP/Azure IPs without residential proxy — Google silently redirects to about:blank or shows speedbump/challenge. This happens even with CloakBrowser stealth. The IP reputation is the blocker, not browser fingerprinting.
+- ❌ **Datacenter proxy + Playwright browser** = too slow; default 20s timeout hits before page loads. Need 30s+ timeout AND `wait_until='commit'` (not `domcontentloaded`)
+- ❌ **Cogent Communications (AS174), M247, Leaseweb IPs** = flagged datacenter. These work for basic HTTP but fail for X/Google SPA rendering
 - ✅ Rotate session ID per account/session
 - ✅ Geo-target to account's country (ID account → ID proxy)
 - ✅ Test proxy before critical operations
 - ✅ Keep backup proxy provider
 - ✅ Verify proxy returns residential ISP in ipinfo.io "org" field (not Amazon/Google/Microsoft/Azure)
+- ✅ For datacenter proxies: use `curl` for API calls, avoid Playwright browser (too slow)

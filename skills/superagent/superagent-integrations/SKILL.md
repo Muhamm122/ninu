@@ -277,6 +277,16 @@ async function sendWA(to, message) {
 
 ---
 
+## X/Twitter Cookies-Based Auth (Internal GraphQL API)
+
+Free alternative to the official v2 API (xurl). Uses `auth_token` + `ct0` cookies to hit undocumented GraphQL endpoints — no developer account or API credits required. ~344 actions/day per account.
+
+→ Full guide: `references/x-cookies-auth.md` — cookie acquisition, verification pattern, pitfalls, Playwright injection, and x_auto.py architecture.
+
+Key pitfall: **Never set `Authorization: Bearer *** header alongside cookies on `x.com/home` page requests — it conflicts and causes rejection. Only add Bearer for `api.x.com/graphql/...` direct API calls.**
+
+---
+
 ## Constraints
 
 - `.env.example` listing every required var

@@ -1,0 +1,275 @@
+{
+  "jobs": [
+    {
+      "id": "fe8092a0be39",
+      "name": "haus-living-daily-post",
+      "prompt": "Kamu adalah content assistant untuk brand furniture \"Haus Living\" (@haus_living1).\n\nBaca file ~/.hermes/haus-living/30-caption-batch.md dan ~/.hermes/haus-living/content-calendar-30hari.md.\n\nTentukan hari ke-berapa dari mulai 1 Juni 2026 (hari ini 4 Juni = hari ke-4).\n\nAmbil caption untuk hari tersebut. Format pesan:\n\n\ud83c\udfe0 **Haus Living \u2014 Daily Post Reminder**\n\n\ud83d\udcc5 Hari ke-[X] dari 30\n\ud83d\udcdd Tipe: [tipe konten]\n\ud83d\udcf8 Saran waktu post: [jam terbaik]\n\n**Caption siap copy-paste:**\n\\`\\`\\`\n[copy caption lengkap disini]\n\\`\\`\\`\n\n**Hashtag:**\n[copy hashtag]\n\n**Checklist foto:**\n- [ ] Foto produk utama\n- [ ] Foto detail/lifestyle (opsional)\n- [ ] Story teaser\n\nTips: Post di jam 11:00-13:00 atau 19:00-21:00 WIB buat engagement maksimal.",
+      "skills": [],
+      "skill": null,
+      "model": "openrouter/owl-alpha",
+      "provider": "openrouter",
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 * * *",
+        "display": "0 8 * * *"
+      },
+      "schedule_display": "0 8 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 3
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-05T03:37:37.233563+00:00",
+      "next_run_at": "2026-06-07T08:00:00+00:00",
+      "last_run_at": "2026-06-06T08:00:46.863175+00:00",
+      "last_status": "error",
+      "last_error": "ImportError: cannot import name 'STEER_CHANNEL_NOTE' from 'agent.prompt_builder' (/home/ubuntu/.hermes/hermes-agent/agent/prompt_builder.py)",
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "439901712",
+        "chat_name": "adib",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "file"
+      ],
+      "workdir": null,
+      "profile": null
+    },
+    {
+      "id": "91b2f09f91e1",
+      "name": "haus-living-weekly-review",
+      "prompt": "Kamu adalah content strategist untuk brand furniture \"Haus Living\" (@haus_living1).\n\nBaca file-file di ~/.hermes/haus-living/ terutama content-calendar-30hari.md dan 30-caption-batch.md.\n\nBuat review mingguan:\n\n\ud83d\udcca **Haus Living \u2014 Weekly Review**\n\n**Minggu ini:**\n- \u2705 Post yang uda jalan (sesuai calendar)\n- \ud83d\udcdd Tipe konten yang dipake (product/edukasi/lifestyle/testimoni)\n\n**Rekomendasi minggu depan:**\n- Konten yang harus diperbanyak\n- Hook/caption yang performa baik\n- Waktu post optimal\n\n**KPI check:**\n- Target: 1 post/hari = 7 post/minggu\n- Target engagement: 3-5% rate\n- Target follower growth: 50-100/minggu\n\n**Tips:**\n- Post Reels 2x/minggu buat reach lebih gede\n- Story tiap hari buat stay di radar follower\n- Reply DM dalam 1 jam\n\nKeep it short dan actionable. Respond in Bahasa Indonesia.",
+      "skills": [],
+      "skill": null,
+      "model": "openrouter/owl-alpha",
+      "provider": "openrouter",
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 20 * * 0",
+        "display": "0 20 * * 0"
+      },
+      "schedule_display": "0 20 * * 0",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-05T03:38:16.004904+00:00",
+      "next_run_at": "2026-06-07T20:00:00+00:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "439901712",
+        "chat_name": "adib",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "file"
+      ],
+      "workdir": null,
+      "profile": null
+    },
+    {
+      "id": "e321e851bb18",
+      "name": "haus-living-monthly-refresh",
+      "prompt": "Kamu adalah content planner untuk brand furniture \"Haus Living\" (@haus_living1).\n\nBaca semua file di ~/.hermes/haus-living/ terutama content-calendar-30hari.md, 30-caption-batch.md, dan product-catalog.md.\n\nGenerate 30 caption baru untuk bulan depan:\n\n1. Variasi dari bulan lalu \u2014 jangan repeat caption yang sama\n2. Mix: 30% product, 23% edukasi, 17% lifestyle, 10% testimoni, 10% trust, 7% promo, 3% engagement\n3. Sesuaikan sama season (kalo mendekati Ramadhan/Lebaran, bikin konten relevan)\n4. Hook yang fresh dan berbeda\n\nFormat output:\n\n\ud83d\udcc5 **Haus Living \u2014 Content Refresh Bulan [BULAN]**\n\n**30 Caption Baru:**\n[Hari 1-30, masing-masing dengan: tipe, hook, caption lengkap, hashtag]\n\n**Weekly Themes:**\n[Tema untk minggu 1-4]\n\n**Special Dates:**\n[Tanggal penting yang bisa dimanfaatin]\n\nSimpan hasilnya ke ~/.hermes/haus-living/30-caption-batch.md (overwrite).\nUpdate juga content-calendar-30hari.md.\n\nRespond in Bahasa Indonesia.",
+      "skills": [],
+      "skill": null,
+      "model": "openrouter/owl-alpha",
+      "provider": "openrouter",
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 1 * *",
+        "display": "0 10 1 * *"
+      },
+      "schedule_display": "0 10 1 * *",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-05T03:39:02.302323+00:00",
+      "next_run_at": "2026-07-01T10:00:00+00:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "439901712",
+        "chat_name": "adib",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "file"
+      ],
+      "workdir": null,
+      "profile": null
+    },
+    {
+      "id": "edb999e895df",
+      "name": "haus-living-evening-prep",
+      "prompt": "Kamu adalah content prep assistant untuk brand furniture \"Haus Living\" (@haus_living1).\n\nBaca ~/.hermes/haus-living/30-caption-batch.md dan content-calendar-30hari.md.\n\nTentukan konten untuk BESOK (hari ke-X+1).\n\nFormat pesan:\n\n\ud83c\udf19 **Haus Living \u2014 Evening Prep**\n\n**Besok hari ke-[X]:**\n\ud83d\udcdd Tipe: [tipe]\n\ud83d\udcf8 Foto yang perlu disiapin:\n- [detail foto yang dibutuhkan]\n\n**Caption preview:**\n[hook + 2 baris pertama caption]\n\n**Tips malam ini:**\n- Siapin foto sebelum tidur biar besok tinggal post\n- Cross-check produk yang difoto = produk di caption\n- Story teaser bisa di-schedule pake IG planner\n\n**Reminder:** Post besok jam [optimal time] WIB.\n\nSleep well, besok konten uda siap! \ud83c\udf1b",
+      "skills": [],
+      "skill": null,
+      "model": "openrouter/owl-alpha",
+      "provider": "openrouter",
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 21 * * *",
+        "display": "0 21 * * *"
+      },
+      "schedule_display": "0 21 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 2
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-05T03:39:39.172946+00:00",
+      "next_run_at": "2026-06-07T21:00:00+00:00",
+      "last_run_at": "2026-06-06T21:03:14.079499+00:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "439901712",
+        "chat_name": "adib",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "file"
+      ],
+      "workdir": null,
+      "profile": null
+    },
+    {
+      "id": "b744628d0dc9",
+      "name": "bbrr-price-alert",
+      "prompt": "BBRI Price Alert Check \u2014 Run this script and if it triggers an alert (exit code 1), send the full report to user:\n\npython3 ~/.hermes/haus-living/bbrr-alert.py\n\nIf alerts are triggered, format a clear message with:\n- Current price and change\n- Which alert level was hit\n- Recommended action\n\nIf no alerts, stay silent (don't spam).",
+      "skills": [],
+      "skill": null,
+      "model": "openrouter/owl-alpha",
+      "provider": "openrouter",
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 120,
+        "display": "every 120m"
+      },
+      "schedule_display": "every 120m",
+      "repeat": {
+        "times": null,
+        "completed": 10
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-06T05:11:11.362691+00:00",
+      "next_run_at": "2026-06-07T03:16:21.205884+00:00",
+      "last_run_at": "2026-06-07T01:16:21.205884+00:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "439901712",
+        "chat_name": "adib",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": null,
+      "profile": null
+    },
+    {
+      "id": "836e7bc3a240",
+      "name": "ninu-daily-sync",
+      "prompt": "Run the NINU auto-sync script to sync all SUPERAGENT data to GitHub:\n\nbash /home/ubuntu/ninu-repo/auto-sync.sh\n\nReport the result \u2014 how many files were updated and pushed. If no changes, stay silent.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 6 * * *",
+        "display": "0 6 * * *"
+      },
+      "schedule_display": "0 6 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-06T08:24:03.547878+00:00",
+      "next_run_at": "2026-06-07T06:00:00+00:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "439901712",
+        "chat_name": "adib",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": null,
+      "profile": null
+    }
+  ],
+  "updated_at": "2026-06-07T01:16:21.206245+00:00"
+}

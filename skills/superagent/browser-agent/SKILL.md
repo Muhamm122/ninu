@@ -62,6 +62,17 @@ export AGENT_BROWSER_PROFILE=~/.agent/browser-profile   # persistent profile
 export AGENT_EXT_CACHE=~/.agent/ext-cache               # resolved extensions cache
 ```
 
+### Hermes gateway browser engine config
+
+After installing CloakBrowser, tell Hermes to use it as the primary browser engine:
+
+```bash
+hermes config set browser.engine cloakbrowser   # stealth-patched Chromium (recommended)
+hermes config set browser.engine auto            # reset to default auto-selection
+```
+
+Default is `auto`. Setting `cloakbrowser` ensures all Hermes browser operations (scraping, automation, dApp interaction) use the stealth-patched Chromium instead of stock Playwright Chromium.
+
 ## Quickstart — install MetaMask from the Web Store, stealth, drive it
 
 ```python
@@ -160,6 +171,24 @@ The following browser stack is configured as the **default** for all browser ope
 - Background cron tasks
 - Gas station / tx signing via injected wallet
 
+## X/Twitter GraphQL API — QID Staleness
+
+X/Twitter's GraphQL API uses **operation-specific queryIds** that change with each frontend release. Old QIDs return `404 {"message":"Query not found"}`. Patterns:
+
+- **`POST x.com/i/api/graphql/{QID}/{OperationName}`** — correct endpoint format (NOT `api.x.com`)
+- **Old QIDs (2024-era)**: `H-t2v_HvFR07ZBP9aOeKoA` (CreateTweet), `S1Pm52XhLrWEx6rlWU3H2g` (CreateFollow), `lI07N6Otwv1PhnEgXILM7A` (FavoriteTweet) — all return **404**
+- **Payload format**: `{"variables": {...}, "features": {...}}` as JSON body
+- **Auth**: `Authorization: Bearer {public_bearer}` + `Cookie: auth_token=...; ct0=...` + `X-Csrf-Token: {ct0}`
+- **Response codes**: 200 = success, 404 = QID expired, 405 = wrong endpoint format, 422 = payload validation error (QID is valid but payload wrong)
+
+**How to get fresh QIDs:**
+1. Load X in browser with cookies (requires residential proxy from VPS)
+2. Use CDP `Network.enable` + `Network.requestWillBeSent` to intercept all `/i/api/graphql/` URLs
+3. Parse URL pattern: `/i/api/graphql/{QID}/{OperationName}`
+4. Store QIDs by operation name — they're stable until next X frontend deploy
+
+**Fallback without browser rendering**: Use `requests.Session` with cookies to GET `x.com/{handle}` or `x.com/home`, then regex-parse `__NEXT_DATA__` or inline JSON for user data. You can READ profile info but cannot EXECUTE mutations (like/follow/post) without fresh QIDs.
+
 ## Shell Quoting — Critical Rule
 
 **NEVER** pass complex JSON or multi-line Python via `terminal(command="python3 -c '...'")` or `terminal(command="curl ... -d '{...}'")`. The shell parser chokes on nested quotes, `$`, `!`, `{`, `}` characters.
@@ -202,6 +231,37 @@ Repeated 3+ times with same result. Not a script issue — pure IP reputation bl
   - Use residential proxy if available
 
 **Do NOT waste time retrying** — if first attempt hits `about:blank`, stop and explain.
+
+**Do NOT waste time retrying** — if first attempt hits `about:blank`, stop and explain.
+
+## X/Twitter from Datacenter IPs — SPA RENDER BLOCK
+
+Unlike Google (which redirects to `about:blank`), X/Twitter **silently refuses to render its React SPA** from datacenter IPs. The page loads (HTTP 200) but the JS app never hydrates:
+
+- Page title shows "X" but no tweets, no timeline, no interactive elements
+- `Network.requestWillBeSent` fires for static assets but **zero GraphQL calls** (the React app never calls the API)
+- Cookies injected via CDP `Network.setCookie` (including httpOnly `auth_token`) are accepted but the app never reads them because it never starts
+- `requests.Session` with the same cookies **does** get user data from `x.com/home` (server-side render) — so cookies ARE valid
+- This is an **IP-level block**, not CAPTCHA, not fingerprint — CloakBrowser stealth does not help
+
+**Confirmed pattern (2026-06-07):**
+```
+Navigate to x.com/home → HTTP 200 → title "X" → zero tweets → zero GraphQL calls
+Same cookies via requests.Session → "screen_name":"muhamm122" found in HTML → cookies VALID
+```
+
+**What works from server IP (requests only):**
+- Cookie verification via `requests.Session` + `x.com/home` HTML parse
+- Profile data extraction (screen_name, followers, tweet count)
+- `x.com/i/api/graphql/{QID}/{Operation}` calls with fresh QIDs (if you have them)
+
+**What does NOT work from server IP (browser):**
+- Any Playwright-rendered X page (SPA never hydrates)
+- CDP Network interception of GraphQL calls (SPA never fires them)
+- Fresh QID extraction (requires live page rendering)
+- Login via browser ("We've temporarily limited your login")
+
+**Recommendation:** Residential proxy (IPRoyal $1.75/GB, Indonesia available) is the ONLY solution for X/Twitter browser automation from VPS.
 
 ## About:Blank Detection
 
@@ -282,6 +342,52 @@ browser = await launch_persistent_context_async(
 - **dApps**: stealth + headless=False (for MetaMask popup), proxy optional
 
 See skills: `residential-proxy` (provider setup/verify), `rotating-proxy-pool` (auto-rotate/geo-routing).
+
+## Chrome DevTools Protocol (CDP)
+
+For **deep browser control** below the Playwright API — social media cookie injection, network interception, anti-detection, device emulation. CDP is essential when:
+
+- You need to inject **httpOnly cookies** (JS `document.cookie` cannot)
+- You need to **intercept GraphQL API calls** (e.g. X/Twitter fresh QID extraction)
+- You need to **modify requests in-flight** (add headers, rewrite payloads)
+- You need **anti-detection JS** that runs before any page script
+
+```python
+cdp = await context.new_cdp_session(page)
+
+# Inject httpOnly cookie (KILLER FEATURE — JS cannot do this!)
+await cdp.send('Network.setCookie', {
+    'name': 'auth_token', 'value': 'xxx', 'domain': '.x.com',
+    'httpOnly': True, 'secure': True, 'sameSite': 'None', 'expires': 1812333299,
+})
+
+# Anti-detection JS (runs before any page script — persists across navigations)
+await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+    'source': 'Object.defineProperty(navigator,"webdriver",{get:()=>undefined});'
+})
+
+# Network interception (live GraphQL QID extraction, request monitoring)
+await cdp.send('Network.enable')
+cdp.on('Network.requestWillBeSent', handler)
+
+# Fetch interception (modify/block requests in-flight — MORE powerful than Network)
+await cdp.send('Fetch.enable', {'patterns': [{'urlPattern': '*', 'requestStage': 'Request'}]})
+cdp.on('Fetch.requestPaused', handler)
+
+# Device emulation (fake iPhone, timezone, locale at engine level)
+await cdp.send('Emulation.setDeviceMetricsOverride', {
+    'mobile': True, 'width': 375, 'height': 812, 'deviceScaleFactor': 3
+})
+```
+
+**Pitfalls:**
+- `Emulation.setLocaleOverride` errors if Playwright context already set locale — use one or the other
+- `Fetch.continueRequest` headers param is `[[name, value], ...]` not a dict — wrong format crashes the session
+- SPA sites (X, Instagram) may not render from datacenter IPs even with CDP stealth — block is IP-level
+- GraphQL QIDs can only be extracted from **live page rendering** — impossible from server-side requests alone
+- For social media login from VPS: CDP works, **but the SPA must render** → requires residential proxy
+
+→ **Full CDP reference**: `references/cdp-protocol.md` (domains, stealth JS, QID extraction pattern, tested capabilities, limitations)
 
 ## Credential Safety
 
