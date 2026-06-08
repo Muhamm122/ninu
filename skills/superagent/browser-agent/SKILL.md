@@ -234,34 +234,50 @@ Repeated 3+ times with same result. Not a script issue — pure IP reputation bl
 
 **Do NOT waste time retrying** — if first attempt hits `about:blank`, stop and explain.
 
-## X/Twitter from Datacenter IPs — SPA RENDER BLOCK
+## X/Twitter from Datacenter IPs — NUANCED BLOCK
 
-Unlike Google (which redirects to `about:blank`), X/Twitter **silently refuses to render its React SPA** from datacenter IPs. The page loads (HTTP 200) but the JS app never hydrates:
+X/Twitter blocks datacenter IPs at **two different levels**, and behavior differs between unauthenticated and authenticated states:
 
-- Page title shows "X" but no tweets, no timeline, no interactive elements
-- `Network.requestWillBeSent` fires for static assets but **zero GraphQL calls** (the React app never calls the API)
-- Cookies injected via CDP `Network.setCookie` (including httpOnly `auth_token`) are accepted but the app never reads them because it never starts
+### Unauthenticated state (x.com landing page) — PARTIALLY renders
+- Landing page loads: "Happening now." heading, login form visible
+- Email/username textbox and "Continue" button are present and addressable by Playwright
+- BUT: "Continue" button **does not respond** — no network request, no DOM change, no error in console
+- "Continue with Google" and "Continue with Apple" buttons also visible but non-functional
+- The form is **decorative** — X renders the HTML but silently disables JS-driven actions from datacenter IPs
+
+### Authenticated state (x.com/home) — does NOT render
+- Cookies injected via CDP `Network.setCookie` are accepted but SPA never hydrates
+- `Network.requestWillBeSent` fires for static assets but **zero GraphQL calls**
 - `requests.Session` with the same cookies **does** get user data from `x.com/home` (server-side render) — so cookies ARE valid
 - This is an **IP-level block**, not CAPTCHA, not fingerprint — CloakBrowser stealth does not help
 
+### httpOnly Cookie Injection — blocked in Hermes browser
+- Hermes Playwright launches with `--remote-debugging-port=0` (random port) — CDP connection from external tools fails
+- `document.cookie` cannot set httpOnly cookies (auth_token, ct0) — SecurityError on non-x.com domain, silently ignored on x.com domain
+- The CDP stealth tool (`cdp_stealth.py`) can inject cookies in its OWN browser session, but cannot connect to the Hermes-managed Playwright instance
+- **Workaround**: Use `x_tool.py` (requests-based) for all X operations from server — it works perfectly without browser rendering
+
 **Confirmed pattern (2026-06-07):**
 ```
-Navigate to x.com/home → HTTP 200 → title "X" → zero tweets → zero GraphQL calls
+x.com landing → form renders, "Continue" button present, click does nothing
+x.com/home with cookies → HTTP 200, zero tweets, zero GraphQL calls
 Same cookies via requests.Session → "screen_name":"muhamm122" found in HTML → cookies VALID
+Same cookies via x_tool.py → whoami, profile, post, search, timeline ALL work
 ```
 
 **What works from server IP (requests only):**
 - Cookie verification via `requests.Session` + `x.com/home` HTML parse
 - Profile data extraction (screen_name, followers, tweet count)
+- `x_tool.py` — whoami, profile, post, search, timeline (full functionality)
 - `x.com/i/api/graphql/{QID}/{Operation}` calls with fresh QIDs (if you have them)
 
 **What does NOT work from server IP (browser):**
-- Any Playwright-rendered X page (SPA never hydrates)
-- CDP Network interception of GraphQL calls (SPA never fires them)
+- Login form "Continue" button (clicks, nothing happens)
+- Any Playwright-rendered X authenticated page (SPA never hydrates)
 - Fresh QID extraction (requires live page rendering)
-- Login via browser ("We've temporarily limited your login")
+- Cookie injection into Hermes-managed browser (no CDP port access)
 
-**Recommendation:** Residential proxy (IPRoyal $1.75/GB, Indonesia available) is the ONLY solution for X/Twitter browser automation from VPS.
+**Recommendation:** Residential proxy (IPRoyal $1.75/GB, Indonesia available) is the ONLY solution for X/Twitter **browser** automation from VPS. For API-level operations (read timeline, post tweets, search), `x_tool.py` works without proxy.
 
 ## About:Blank Detection
 

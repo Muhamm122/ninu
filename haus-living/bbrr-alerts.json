@@ -1,7 +1,8 @@
 {
-  "last_check": "2026-06-07 05:17:50",
-  "price": 2740.0,
+  "last_check": "2026-06-08 05:52:03",
+  "price": 2660.0,
   "alerts": [
-    "\ud83d\udfe2 [HIGH] BUY_ZONE_MAX: Rp 2,740.0 <= Rp 2,780 (BUY ZONE!)"
+    "\ud83d\udfe2 [HIGH] STRONG_BUY: Rp 2,660.0 <= Rp 2,730 (BUY ZONE!)",
+    "\ud83d\udfe2 [HIGH] BUY_ZONE_MAX: Rp 2,660.0 <= Rp 2,780 (BUY ZONE!)"
   ]
 }

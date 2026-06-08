@@ -250,6 +250,15 @@ Hermes auto-masks API tokens/secrets before any file write — even via Python `
 - **Command aliases** — `!catalog` → `!katalog`, `!price` → `!harga`, `!diskon` → `!promo`
 - **Footer branding** — every embed: `footer.text="BrandName — @handle"`
 
+### Task Tracker / CRUD API Pattern (FastAPI + SQLite)
+
+When building a task tracker or CRUD API alongside an existing FastAPI service (e.g., Haus Living webhook server), see the **FastAPI + SQLite Task Tracker Micro-Pattern** in `superagent-infra` skill. Key points:
+- Add endpoints to the existing FastAPI `app` instance (no separate server)
+- SQLite with `PRAGMA journal_mode=WAL` for concurrent reads
+- Auth via `X-API-Key` header with constant-time comparison
+- Nginx location block: `location /task/ { proxy_pass http://haus_api/task/; }`
+- Test with Python `urllib.request` — NOT curl (bash glob `***` corrupts tokens)
+
 ### python-telegram-bot v20+ Compatibility
 - `allow_re_entry=True` is **NOT a valid ConversationHandler kwarg** — removed in v20+
 - **Fix**: Use `per_user=True` instead (or omit entirely)
@@ -507,8 +516,13 @@ async def init_session():
 ```python
 client = TelegramClient(session_path, api_id, api_hash)
 await client.connect()
-# Session file stores auth — no re-login needed
+if not await client.is_user_authorized():
+    # Session expired or wrong API_ID — re-login needed
+    ...
+me = await client.get_me()
 ```
+
+**`client.start()` asks for phone even with valid session** — use `client.connect()` + `is_user_authorized()` instead to auto-detect existing sessions.
 
 ### Key Operations
 
@@ -567,6 +581,159 @@ TG_SESSION=/home/ubuntu/.hermes/tg_user.session
 - **Stale session file** — if Telethon throws cryptic TypeErrors on connect, delete `*.session*` files and re-auth.
 - **AWS/VPS IP is fine** — unlike Google, Telegram does NOT block datacenter IPs for MTProto login. Phone codes arrive in the Telegram app itself (not SMS to the server).
 - **Rate limits** — Telethon respects Telegram's flood limits automatically. For bulk operations, add `await asyncio.sleep(1)` between calls.
+- **Session with wrong API_ID** — `is_user_authorized()` returns `False` even with a valid session file if the `api_id` doesn't match the one used to create the session. Session files are bound to the API_ID+API_HASH pair. If you get `False`, try the original API_ID or create a new session.
+
+### python-telegram-bot v20+ Pattern (Bot API — recommended for new bots)
+
+For new bots, prefer **python-telegram-bot** (v20+) over Telethon. No session management needed — just a bot token from @BotFather.
+
+```bash
+pip install python-telegram-bot
+```
+
+**Key pattern — Application builder with handlers:**
+
+```python
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+
+BOT_TOKEN = "123456:ABC-DEF..."
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("📊 Stats", callback_data="stats")],
+        [InlineKeyboardButton("📋 List", callback_data="list")],
+    ]
+    await update.message.reply_text("Welcome!", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def btn_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "stats":
+        await query.edit_message_text("Stats here...")
+
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CallbackQueryHandler(btn_callback))
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == "__main__":
+    main()
+```
+
+**PM2 deployment:**
+
+```bash
+cat > ecosystem.config.cjs << 'EOF'
+module.exports = {
+  apps: [{
+    name: 'my-bot',
+    script: '/home/ubuntu/bot.py',
+    interpreter: 'python3',
+    cwd: '/home/ubuntu',
+    env: { NODE_ENV: 'production' },
+    autorestart: true,
+    max_restarts: 10,
+    restart_delay: 5000,
+  }],
+};
+EOF
+pm2 start ecosystem.config.cjs
+```
+
+**Key differences from Telethon pattern:**
+- No session file needed — bot token is enough
+- `python-telegram-bot` uses `Application` builder (v20+), NOT `Updater`
+- `CommandHandler("start", callback)` — command name without `/`
+- `CallbackQueryHandler` for inline button presses
+- `allowed_updates=Update.ALL_TYPES` for full event coverage
+- Token in code is OK for PM2-managed bots (not exposed to Hermes file-write masking since PM2 reads from the file directly)
+
+**Token security:** Bot tokens CAN be stored in `.py` files for PM2-managed bots. The Hermes masking only triggers on file-write operations from within Hermes sessions, not on files read by PM2 at runtime. However, still prefer env var `BOT_TOKEN` for production:
+
+```python
+import os
+BOT_TOKEN=os.get...N", "fallback-token-here")
+```
+
+Then set in PM2: `BOT_TOKEN='***' pm2 start ecosystem.config.cjs`
+
+### Telegram Bot API Limitations
+
+**Bot API CANNOT create groups or channels.** Bots can only be added to groups/channels created by users. Flow for multi-group setup:
+
+1. User creates groups/channels manually in Telegram
+2. User adds bot as admin to each group
+3. User sends `/getid` in each group → bot replies with chat ID
+4. User forwards all chat IDs to operator → operator registers them in the bot's config
+
+**Pre-register known groups** via JSON file loaded at startup:
+
+```python
+# groups.json — chat_id → topic mapping
+{
+  "-1003928436326": {"topic": "airdrop", "name": "🎁 Airdrop"},
+  "-1004298792270": {"topic": "agent", "name": "⚙️ Pengaturan Agent"},
+  "-1004295492283": {"topic": "trading", "name": "💰 Trading"},
+  "-1003952018713": {"topic": "haus", "name": "🏠 Haus Living"}
+}
+```
+
+Load at startup:
+```python
+import json, os
+GROUPS_FILE = "/home/ubuntu/task_bot_groups.json"
+def load_groups():
+    if os.path.exists(GROUPS_FILE):
+        with open(GROUPS_FILE) as f:
+            return json.load(f)
+    return {}
+def get_topic(chat_id):
+    return load_groups().get(str(chat_id), {}).get("topic", "general")
+```
+
+**Group registration command:** `/register <topic>` — binds the current chat to a topic category. All tasks created in that group automatically use that topic as the category.
+
+**Multi-topic task tracking:** Each group maps to a topic. `/list` and `/stats` auto-filter by the group's registered topic. No need for users to specify category manually.
+
+### Task Tracker Bot Pattern (Telethon + #command syntax)
+
+Build a task tracker that uses `#<topic> <subcommand>` commands via Telethon:
+
+```python
+# Bot parses: #task add <title> | <category> | <note>
+#             #task list [N]
+#             #task stats
+#             #task done <id>
+#             #task del <id>
+#             #task update <id> | <title> | <cat> | <note>
+#             #task help
+
+from telethon import events
+
+@client.on(events.NewMessage(pattern=r"^#", outgoing=True))
+async def handle_command(event):
+    text = event.raw_text
+    parts = text[1:].split(None, 2)  # topic, subcommand, rest
+    topic, sub, args = parts[0].lower(), parts[1].lower(), parts[2] if len(parts) > 2 else ""
+    
+    if topic in ("task", "tasks", "t"):
+        if sub == "stats":
+            # Call task API → format stats → edit message
+            await event.edit(fmt_stats(api_get("/task/stats")))
+        elif sub == "add":
+            # Parse: title | category | note
+            # Call POST /task/add → edit message with result
+        # ... etc
+```
+
+**Key design decisions:**
+- Commands start with `#` (natural for Telethon outgoing message matching)
+- Pipe `|` separator for multi-field input (avoids shell quoting issues)
+- `events.NewMessage(outgoing=True)` catches messages from the user's own account (not bot)
+- Edit the original message `event.edit()` instead of replying (cleaner UX)
+- Backend API is FastAPI + SQLite on localhost (separate port, nginx proxied)
 
 ### Script
 
@@ -575,6 +742,28 @@ scripts/tg_user.py
 ```
 
 Set `TG_API_ID`, `TG_API_HASH`, `TG_PHONE` env vars. Run `tg_user.py init` first time, then `tg_user.py dialogs`, `tg_user.py read CHAT_ID 10`, etc.
+
+### Script
+
+```
+scripts/tg_user.py
+```
+
+Set `TG_API_ID`, `TG_API_HASH`, `TG_PHONE` env vars. Run `tg_user.py init` first time, then `tg_user.py dialogs`, `tg_user.py read CHAT_ID 10`, etc.
+
+### File Sending
+
+For sending local files (PDF, ZIP, images, etc.) to Telegram via Bot API, use the `telegram-file-sender` skill + `tg_file_sender.py` tool. This handles the Hermes cache directory requirement (files must be under `~/.hermes/cache/` or the gateway silently drops them).
+
+```bash
+python3 ~/.hermes/skills/superagent/tools/tg_file_sender.py /path/to/file.pdf --caption "Report"
+```
+
+See `telegram-file-sender` skill for full details.
+
+### Task Tracker Reference
+
+See `references/task-tracker.md` for the full FastAPI + SQLite + Telethon bot architecture deployed alongside Haus Living API.
 
 ---
 

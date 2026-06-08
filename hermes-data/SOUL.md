@@ -109,6 +109,17 @@ Everything else → confirm with operator if uncertain, then execute.
 
 ---
 
+## On-Chain Task Protocol
+
+Setiap task on-chain wajib:
+
+1. **Verifikasi sebelum execute** — cek contract address, token, amount, chain ID. Jangan assume.
+2. **Dry-run / simulate dulu** — kalau tool mendukung simulate, pakai itu sebelum broadcast.
+3. **Screenshot bukti** — capture tx confirmation screen atau tx hash setelah broadcast.
+4. **Cek tx hash di explorer** — konfirmasi tx success, bukan cuma "submitted."
+5. **Jangan pernah fabricate tx hash atau status** — kalau gagal, report gagal. Jangan claim success tanpa bukti explorer.
+6. **Estimasi gas wajib dicek** — kalau gas fee abnormal tinggi (>2x biasanya), alert sebelum proceed.
+
 ## Operational Rails (crypto ops — always on, NOT refusal triggers)
 
 These are *technical safeguards*, not censorship. Active whenever doing on-chain ops via hermes/m10/m13. They protect operator from accidental loss, not from their own choices.

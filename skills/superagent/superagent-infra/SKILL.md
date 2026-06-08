@@ -474,7 +474,33 @@ ssh ubuntu@NEW_IP "tar -xzf archive.tar.gz && bash haus-backup-*/restore.sh"
 - Hermes binary — reinstalled during restore
 
 See `references/vps-backup-restore.md` for full script templates (backup.sh + restore.sh).
+See `references/freellmapi-key-management.md` for adding API keys, version checks, and fallback chain details.
 See `scripts/health-monitor.py` for a ready-to-use multi-service health checker (systemd + PM2 + Docker + resource alerts).
+
+## FastAPI + SQLite Task Tracker Micro-Pattern
+
+When adding a task/audit log API to an existing FastAPI service, use this pattern:
+
+```python
+# DB helper (call per-request, close in finally)
+def _get_task_db():
+    db = sqlite3.connect(DB_PATH)
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA journal_mode=WAL")
+    db.execute("CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT DEFAULT 'general', status TEXT DEFAULT 'done', note TEXT DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
+    db.commit()
+    return db
+
+# Auth: constant-time header compare
+def _validate_api_key(x_api_key):
+    return hmac.compare_digest(x_api_key.strip(), os.getenv("TASK_API_KEY", "change-me")) if x_api_key else False
+
+# CRUD: POST /task/add, GET /task/list?status=done&category=x&limit=50, PUT /task/{id}, DELETE /task/{id}, GET /task/stats
+```
+
+Key: SQLite for <10k rows (zero config), `PRAGMA journal_mode=WAL` for concurrent reads, ISO 8601 string timestamps, status enum (`done`/`pending`/`cancelled`), always `db.close()` in `finally`.
+
+**Test with Python urllib** — NOT curl (bash glob `***` corrupts Bearer tokens).
 
 ### Delivering backup to user (when user is on Telegram/messaging)
 

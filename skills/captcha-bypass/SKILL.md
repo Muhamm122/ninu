@@ -25,6 +25,7 @@ pip install playwright playwright-stealth
 See `references/sctg-solver.md` for full SCTG API docs, pricing, and integration.
 See `references/vinci-world-otp.md` for Vinci World OTP login flow details and DOM structure.
 See `references/gmail-oauth-vs-app-password-vps.md` for a detailed failure log of every OAuth approach from VPS and why App Password is the only viable path for personal Gmail.
+See `references/airdrop-api-discovery.md` for the pattern of discovering REST API endpoints from airdrop/Web3 sites via `performance.getEntriesByType()` and inline `<script>` analysis — faster than browser form submission.
 
 ## API Keys Required
 ```env
@@ -213,7 +214,10 @@ These are **IP reputation blocks** that happen BEFORE any CAPTCHA is shown. YesC
 |----------|---------------|-------------|----------|
 | **Gmail signup** | "Sorry, we could not create your Google Account" | After password step | Residential proxy only |
 | **X/Twitter signup** | "Sorry, you are not allowed to log in at this time" | At phone step | Residential proxy only |
-| **X/Twitter SPA render** | Page loads (HTTP 200) but zero tweets, zero GraphQL calls, React never hydrates | Any X page from datacenter IP | Residential proxy only |
+| **X/Twitter landing form** | Login form renders, "Continue" button present but click does nothing | Unauthenticated x.com from datacenter IP | Residential proxy only |
+| **X/Twitter SPA render** | Page loads (HTTP 200) but zero tweets, zero GraphQL calls, React never hydrates | Any authenticated X page from datacenter IP | Residential proxy only; WARP may improve |
+| **X/Twitter httpOnly cookies** | Hermes Playwright has no CDP port access; document.cookie can't set httpOnly cookies | All X browser auth from VPS | Use x_tool.py (requests) instead; works with or without WARP |
+| **X/Twitter v1.1 API** | `api.x.com/1.1/` endpoints return 404 (not 401) — fully decommissioned as of 2026-06 | Any code using v1.1 REST endpoints | Use GraphQL (`api.x.com/graphql/`) exclusively |
 | **Google OAuth login** | "This browser or app may not be secure" | At email entry | Residential proxy only |
 | **NVIDIA NIM** | hCaptcha loop / block | At signup | Residential proxy or manual from phone |
 
@@ -263,7 +267,59 @@ Kalo user ga paham teknis:
 
 ## OTP-Based Auth Flows (e.g., Vinci World, Magic Links)
 
-Many Web3 and modern apps use **email OTP** instead of password login. Pattern:
+Many Web3 and modern apps use **email OTP** instead of password login.
+
+### Preferred: Auto-OTP via IMAP Polling
+
+When you have IMAP access to the user's Gmail (App Password configured), **automate the OTP retrieval** — don't ask the user for the code. This is especially useful for Privy.io-powered Web3 sites (Vinci World, etc.).
+
+Full pattern in `references/vinci-world-otp.md` and `superagent-web3` skill `references/airdrop-research-pattern.md` Step 7c.
+
+**✅ Auto-OTP proven working** — fully automated Vinci World registration completed with zero user input:
+1. Navigate to target → Login → Email field → type `adibmuhadi@gmail.com` → click **"Send OTP"**
+2. IMAP poll loop (every 5s, 90s max) finds OTP email from `no-reply@privy.io` (Privy.io sends for many Web3 sites)
+3. Regex `r'\b(\d{6})\b'` extracts code from email body
+4. Type 6 digits into separate input fields via `browser_type` ref
+5. Page auto-submits → logged in. **Entire flow: ~15 seconds, zero user interaction.**
+
+Key implementation details:
+- Gmail App Password stored in himalaya config (`~/.config/himalaya/config.toml` → `passwd-cmd`)
+- Some OTP emails come from **Privy.io** (`no-reply@privy.io`) not the target domain — search by `(FROM "privy.io")` not `(FROM "vinciworld")`
+- OTP email subject format: `"Your login code for <AppName>"` where AppName may differ from domain (Renaiss for Vinci World)
+- IMAP search `(FROM "privy.io")` is more reliable than `(SUBJECT "Vinci")` for Privy-powered sites
+- After entering OTP, check `document.body.innerText` for success text like "You're on the list!" rather than relying on DOM snapshots
+
+Quick version:
+```python
+# After clicking "Send OTP" in browser, poll IMAP for the code:
+import imaplib, email, re, time
+def poll_otp(email_addr, app_password, from_filter="privy.io", max_wait=90):
+    seen = set()
+    start = time.time()
+    while time.time() - start < max_wait:
+        mail = imaplib.IMAP4_SSL('imap.gmail.com')
+        mail.login(email_addr, app_password)
+        mail.select('INBOX')
+        _, data = mail.search(None, f'(FROM "{from_filter}")')
+        for eid in reversed(data[0].split()):
+            eid_str = eid.decode()
+            if eid_str in seen: continue
+            seen.add(eid_str)
+            _, msg_data = mail.fetch(eid, '(RFC822)')
+            msg = email.message_from_bytes(msg_data[0][1])
+            body = ''.join(p.get_payload(decode=True).decode(errors='ignore') 
+                          for p in msg.walk() if p.get_content_type() == 'text/plain') or \
+                   ''.join(p.get_payload(decode=True).decode(errors='ignore')
+                          for p in msg.walk() if p.get_content_type() == 'text/html')
+            otp = re.search(r'\b(\d{6})\b', body)
+            if otp: mail.logout(); return otp.group(1)
+        mail.logout(); time.sleep(5)
+    return None
+```
+
+### Fallback: Manual OTP
+
+If no IMAP access, use this flow:
 
 1. Enter email in textbox → click **"Send OTP"** / **"Send Code"**
 2. Page shows 6-digit input fields (one per digit) or a single code field

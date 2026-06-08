@@ -87,3 +87,25 @@ pixels = np.array(img)
 **Pitfall**: Writing to `/home/ubuntu/.9router/db/data.sqlite` while 9Router is running causes lock conflicts or data loss.
 
 **Fix**: Always `sudo systemctl stop 9router` before modifying the DB, then `sudo systemctl start 9router` after commit.
+
+## PM2 `pm2 set` Wipes All Env Vars
+
+**Pitfall**: `pm2 set freellmapi:env '{"PROXY_RATE_LIMIT_RPM":"0"}'` replaces the ENTIRE process env. ENCRYPTION_KEY, NODE_ENV, and all other vars are gone. FreeLLMAPI then auto-generates a new encryption key, making all previously encrypted API keys unrecoverable.
+
+**Prevention**: Use ecosystem.config.cjs for env vars. Never use `pm2 set` for FreeLLMAPI.
+
+**Recovery**: Check `SELECT value FROM settings WHERE key = 'encryption_key'` — if the old key is still there, restart with ecosystem file using that key. If regenerated, re-insert all API keys.
+
+## Shell Glob Expansion Corrupts Bearer Tokens
+
+**Pitfall**: Bash expands `***` as a glob pattern inside double-quoted strings. A token like `freellmapi-...` gets corrupted.
+
+**Fix**: Use Python `urllib.request` for all API calls with secrets. For curl, write payload to file and use `@/tmp/payload.json`.
+
+## FreeLLMAPI 429 After Disabling IP Rate Limit
+
+**Pitfall**: After setting `PROXY_RATE_LIMIT_RPM=0`, 429 errors still appear. This is NOT FreeLLMAPI's IP limiter — it's the upstream provider (OpenRouter, NVIDIA, etc.) rate-limiting the API key.
+
+**Diagnosis**: FreeLLMAPI IP 429 body says "Rate limit exceeded: more than N requests per minute". Upstream 429 includes provider-specific headers.
+
+**Fix**: Add more API keys from different providers, or add multiple keys per platform.

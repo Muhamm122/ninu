@@ -29,12 +29,15 @@ Residential proxies route traffic through real ISP IPs — appearing as normal h
 
 | Provider | Type | Bandwidth | Geo | Limitation |
 |----------|------|-----------|-----|------------|
+| **Cloudflare WARP** ⭐ | SOCKS5 (Cloudflare exit) | Unlimited | Auto (nearby) | Not true residential; Cloudflare ASN but much better than AWS/GCP |
 | **ProxyScrape** | Residential | 10 free IPs | US/EU | Slow, low uptime |
 | **Webshare** | Residential | 10 IPs free | US | 1GB/month, slow |
 | **GeoNode** | Residential | Free list | Global | Unreliable, public |
 | **FreeProxyList** | Mixed | Unlimited | Global | Mostly datacenter, unstable |
 
-> ⚠️ Free residential proxies are **unreliable**. For production (Gmail signup, Stripe, etc.), use paid providers.
+> ⭐ **Cloudflare WARP** is the best free option for VPS — unlimited bandwidth, SOCKS5 on `localhost:40000`, Cloudflare exit IP (good reputation). Not residential, but FAR better than raw AWS/GCP/Azure IP. See `references/warp-setup.md` for install steps. See `references/warp-test-results.md` for real-world test results from AWS Singapore VPS.
+
+> ⚠️ Free residential proxies (ProxyScrape/Webshare free tier) are **unreliable**. For production (Gmail signup, Stripe, etc.), use paid providers.
 
 ### Paid Providers (Best Value)
 
@@ -223,3 +226,7 @@ If user sends Google credentials for automated signup from a server, refuse and 
 - ✅ Keep backup proxy provider
 - ✅ Verify proxy returns residential ISP in ipinfo.io "org" field (not Amazon/Google/Microsoft/Azure)
 - ✅ For datacenter proxies: use `curl` for API calls, avoid Playwright browser (too slow)
+- ✅ **Cloudflare WARP** is free, unlimited, and better than raw VPS IP — install as first step on any VPS. Set `browser.proxy: socks5://127.0.0.1:40000` in Hermes config. Requires gateway restart to take effect in browser tools; `x_tool.py` and `curl` respect `ALL_PROXY` env var immediately.
+- ✅ **Webshare free tier** — user can sign up at webshare.io for 10 free proxy IPs (1GB/month). Good for testing, too slow/unreliable for production. Paid plan $1/250GB is cheapest entry for residential.
+- ⚠️ **WARP exit IP is Cloudflare (AS13335)** — still datacenter, not residential. Works for sites that block AWS/GCP but allow Cloudflare. Does NOT work for Google account creation or strict residential checks.
+- ⚠️ **Webshare checkout pending** — if user has a Webshare account with pending order, they must login at dashboard.webshare.io from phone/PC to complete checkout (agent cannot accept passwords)

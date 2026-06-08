@@ -9,11 +9,12 @@ import hmac
 import json
 import os
 import logging
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, Request, HTTPException, Header
+from fastapi import FastAPI, Request, HTTPException, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -27,6 +28,43 @@ WEBHOOK_DIR.mkdir(parents=True, exist_ok=True)
 
 APP_VERSION = "1.0.0"
 APP_NAME = "Haus Living Webhook Listener"
+
+# ---------------------------------------------------------------------------
+# Task Tracker DB
+# ---------------------------------------------------------------------------
+
+TASK_DB_PATH = Path(os.getenv("HAUS_TASK_DB", os.path.expanduser("~/.hermes/haus-living/tasks.db")))
+TASK_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+def _get_task_db() -> sqlite3.Connection:
+    db = sqlite3.connect(str(TASK_DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA journal_mode=WAL")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            category TEXT DEFAULT 'general',
+            status TEXT DEFAULT 'done',
+            note TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tasks_category ON tasks(category)
+    """)
+    db.commit()
+    return db
+
+def _validate_api_key(x_api_key: Optional[str]) -> bool:
+    expected = os.getenv("HAUS_TASK_API_KEY", "haus_living_task_key_2026")
+    if not x_api_key:
+        return False
+    return hmac.compare_digest(x_api_key.strip(), expected)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -113,6 +151,11 @@ async def api_info():
             "payment_webhook": "POST /webhook/payment",
             "instagram_webhook": "POST /webhook/ig",
             "health_check": "GET /webhook/health",
+            "task_stats": "GET /task/stats",
+            "task_list": "GET /task/list",
+            "task_add": "POST /task/add",
+            "task_update": "PUT /task/{id}",
+            "task_delete": "DELETE /task/{id}",
         },
         "webhook_storage": str(WEBHOOK_DIR),
     }
@@ -281,6 +324,150 @@ async def webhook_instagram(request: Request):
             "timestamp": _now_iso(),
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Task Tracker Routes
+# ---------------------------------------------------------------------------
+
+@app.get("/task/stats", summary="Task tracker stats")
+async def task_stats(x_api_key: Optional[str] = Header(None)):
+    if not _validate_api_key(x_api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    db = _get_task_db()
+    try:
+        total = db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+        done = db.execute("SELECT COUNT(*) FROM tasks WHERE status='done'").fetchone()[0]
+        pending = db.execute("SELECT COUNT(*) FROM tasks WHERE status='pending'").fetchone()[0]
+        cats = db.execute("SELECT category, COUNT(*) as cnt FROM tasks GROUP BY category ORDER BY cnt DESC").fetchall()
+        return {
+            "total": total,
+            "done": done,
+            "pending": pending,
+            "by_category": {r["category"]: r["cnt"] for r in cats},
+        }
+    finally:
+        db.close()
+
+
+@app.get("/task/list", summary="List tasks")
+async def task_list(
+    x_api_key: Optional[str] = Header(None),
+    status: Optional[str] = Query(None, description="Filter by status: done, pending, all"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    if not _validate_api_key(x_api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    db = _get_task_db()
+    try:
+        query = "SELECT * FROM tasks WHERE 1=1"
+        params: list = []
+        if status and status != "all":
+            query += " AND status = ?"
+            params.append(status)
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        rows = db.execute(query, params).fetchall()
+        return {
+            "tasks": [dict(r) for r in rows],
+            "count": len(rows),
+            "limit": limit,
+            "offset": offset,
+        }
+    finally:
+        db.close()
+
+
+@app.post("/task/add", summary="Add a completed task")
+async def task_add(request: Request, x_api_key: Optional[str] = Header(None)):
+    if not _validate_api_key(x_api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    title = (body.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title is required")
+
+    category = (body.get("category") or "general").strip()
+    status_val = (body.get("status") or "done").strip()
+    if status_val not in ("done", "pending", "cancelled"):
+        status_val = "done"
+    note = (body.get("note") or "").strip()
+    now = _now_iso()
+
+    db = _get_task_db()
+    try:
+        cur = db.execute(
+            "INSERT INTO tasks (title, category, status, note, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+            (title, category, status_val, note, now, now),
+        )
+        db.commit()
+        return {
+            "id": cur.lastrowid,
+            "title": title,
+            "category": category,
+            "status": status_val,
+            "created_at": now,
+        }
+    finally:
+        db.close()
+
+
+@app.put("/task/{task_id}", summary="Update a task")
+async def task_update(task_id: int, request: Request, x_api_key: Optional[str] = Header(None)):
+    if not _validate_api_key(x_api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    db = _get_task_db()
+    try:
+        row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        title = (body.get("title") or row["title"]).strip()
+        category = (body.get("category") or row["category"]).strip()
+        status_val = (body.get("status") or row["status"]).strip()
+        if status_val not in ("done", "pending", "cancelled"):
+            status_val = row["status"]
+        note = body.get("note", row["note"])
+        now = _now_iso()
+
+        db.execute(
+            "UPDATE tasks SET title=?, category=?, status=?, note=?, updated_at=? WHERE id=?",
+            (title, category, status_val, note, now, task_id),
+        )
+        db.commit()
+        return {"id": task_id, "title": title, "category": category, "status": status_val, "updated_at": now}
+    finally:
+        db.close()
+
+
+@app.delete("/task/{task_id}", summary="Delete a task")
+async def task_delete(task_id: int, x_api_key: Optional[str] = Header(None)):
+    if not _validate_api_key(x_api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    db = _get_task_db()
+    try:
+        row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Task not found")
+        db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        db.commit()
+        return {"deleted": True, "id": task_id}
+    finally:
+        db.close()
 
 
 # ---------------------------------------------------------------------------

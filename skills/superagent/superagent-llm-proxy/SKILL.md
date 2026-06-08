@@ -50,14 +50,65 @@ FALLBACK4: OpenCode Proxy (:19912) — FREE, 45 models
 
 ## FreeLLMAPI Install
 
+### ⚠️ CRITICAL: PM2 Env Management
+
+**`pm2 set` replaces the ENTIRE process env with a single JSON string — it does NOT merge.**
+
 ```bash
-git clone https://github.com/tashfeenahmed/freellmapi.git /opt/freellmapi
-cd /opt/freellmapi
-npm install && npm run build
-ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" > .env
-echo "PORT=3001" >> .env
+# ❌ WRONG — wipes ENCRYPTION_KEY, NODE_ENV, and ALL other env vars
+pm2 set freellmapi:env '{"PROXY_RATE_LIMIT_RPM":"0"}'
+
+# ✅ CORRECT — use ecosystem config file
+cat > /opt/freellmapi/ecosystem.config.cjs << 'EOF'
+module.exports = {
+  apps: [{
+    name: 'freellmapi',
+    script: 'dist/index.js',
+    cwd: '/opt/freellmapi/server',
+    env: {
+      ENCRYPTION_KEY: 'your-64-char-hex-key-here',
+      PROXY_RATE_LIMIT_RPM: '0',
+      NODE_ENV: 'production',
+    },
+  }],
+};
+EOF
+pm2 start /opt/freellmapi/ecosystem.config.cjs
 ```
+
+**`pm2 start --env` flag does NOT work either** — process env vars are not set. Only ecosystem files reliably pass env vars.
+
+**`pm2 restart --update-env`** is needed after `pm2 set` to pick up new env, but `pm2 set` replaces the whole env so it's still dangerous.
+
+**dotenvx injection**: FreeLLMAPI uses `dotenvx` which scans `../.env` from working directory and **overrides** `process.env` vars. Even if PM2 sets ENCRYPTION_KEY, a `.env` file in parent dir can nullify it. Log line `◇ injected env (0) from ../.env` means 0 vars injected (safe). If count > 0, those vars are overriding PM2 env. Always check `/opt/freellmapi/.env` for unexpected overrides.
+
+**Recovery if ENCRYPTION_KEY was wiped**:
+1. Find the original key in DB: `SELECT value FROM settings WHERE key = 'encryption_key'`
+2. If the DB key was also regenerated, you must re-insert all API keys (old encrypted keys are unrecoverable)
+3. Use ecosystem file to restart with the correct ENCRYPTION_KEY
+
+### ⚠️ CRITICAL: Shell Quoting with Secrets
+
+**Bash expands `***` as glob pattern.** Any Bearer token containing `***` will be corrupted.
+
+```bash
+# ❌ WRONG — *** expanded by bash glob
+curl -H "Authorization: Bearer *** -d '...'
+
+# ✅ CORRECT — use Python
+import urllib.request, json
+KEY = "freellmapi-..."
+req = urllib.request.Request(url, data=payload,
+    headers={"Authorization": "Bearer " + KEY}, method="POST")
+```
+
+### ⚠️ CRITICAL: FreeLLMAPI Auth Check
+
+**FreeLLMAPI Auth Key Format**: The unified API key is stored as **plaintext** in DB `settings` table (`key = 'unified_api_key'`). Format: `freellmapi-<64-hex-chars>` (total 59 chars). Example: `freellmapi-3f3ae86521eba8c49ec39d2380a632833b544bd927b3fde0`. To verify: `cd /opt/freellmapi/server && node -e "const Database = require('better-sqlite3')('./data/freeapi.db'); const row = Database.prepare('SELECT value FROM settings WHERE key = ?').get('unified_api_key'); console.log(row.value);"`
+
+**Shell quoting**: NEVER use `Bearer ***` inline in bash curl — glob expansion corrupts tokens. Always use Python urllib for API calls with secrets.
+
+
 
 ## Systemd Service
 
@@ -118,13 +169,67 @@ curl -s http://127.0.0.1:3001/api/settings/api-key \
   -H "Authorization: Bearer <ADMIN_TOKEN>"
 ```
 
+### Direct SQLite Key Insertion (When Admin API Unavailable)
+
+FreeLLMAPI encrypts keys with AES-256-GCM. Insert directly via Node.js:
+
+```bash
+cd /opt/freellmapi/server  # MUST run from here (node_modules exists)
+
+node --input-type=module -e '
+import crypto from "crypto";
+import Database from "better-sqlite3";
+import dotenv from "dotenv";
+dotenv.config({ path: "/opt/freellmapi/.env" });
+
+const ALGO = "aes-256-gcm";
+const db = new Database("/opt/freellmapi/server/data/freeapi.db");
+let encKey = process.env.ENCRYPTION_KEY;
+if (!encKey) {
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get("encryption_key");
+    encKey = row ? row.value : crypto.randomBytes(32).toString("hex");
+}
+const kb = Buffer.from(encKey, "hex");
+
+function encrypt(text) {
+    const iv = crypto.randomBytes(16);
+    const c = crypto.createCipheriv(ALGO, kb, iv);
+    return { e: c.update(text, "utf8", "hex") + c.final("hex"), iv: iv.toString("hex"), at: c.getAuthTag().toString("hex") };
+}
+
+const now = new Date().toISOString().replace("T"," ").slice(0,19);
+const [,, platform, label, key] = process.argv;
+const enc = encrypt(key);
+db.prepare("INSERT INTO api_keys (platform,label,encrypted_key,iv,auth_tag,status,enabled,created_at) VALUES (?,?,?,?,?,?,?,?)")
+  .run(platform, label, enc.e, enc.iv, enc.at, "unknown", 1, now);
+console.log("Added:", platform, label);
+' <platform> <label> <key>
+```
+
+**Key insertion pitfalls**:
+- Must run from `/opt/freellmapi/server` (NOT /tmp — `better-sqlite3` native module not found)
+- Use `--input-type=module` for ESM imports
+- DB path: `/opt/freellmapi/server/data/freeapi.db` (NOT `dist/db/freellmapi.db` — that's an empty placeholder)
+- `execute_code` blocks subprocess calls; use `terminal()` for shell commands
+- Shell quoting: write JSON payloads to file first (`/tmp/payload.json`), reference with `@` in curl
+
+See `references/2026-06-08-keys-fallback.md` for detailed session notes.
+
 ## Adding New Providers (MiMo, Groq, Cerebras, etc.)
 
 **Provider base URLs:**
-| Provider | Base URL |\n|----------|----------|\n| Groq | `https://api.groq.com/openai/v1` |\n| Cerebras | `https://api.cerebras.ai/v1` |\n| Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` |\n| DeepSeek | `https://api.deepseek.com/v1` |\n| SambaNova | `https://api.sambanova.ai/v1` |\n| OpenCode | `https://opencode.ai/zen/v1` |\n| NVIDIA NIM | `https://integrate.api.nvidia.com/v1` |
+| Provider | Base URL |
+|----------|----------|
+| Groq | `https://api.groq.com/openai/v1` |
+| Cerebras | `https://api.cerebras.ai/v1` |
+| Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| DeepSeek | `https://api.deepseek.com/v1` |
+| SambaNova | `https://api.sambanova.ai/v1` |
+| OpenCode | `https://opencode.ai/zen/v1` |
+| NVIDIA NIM | `https://integrate.api.nvidia.com/v1` |
 
 **Steps:**
-1. Add key to FreeLLMAPI via admin API
+1. Add key to FreeLLMAPI via admin API or direct SQLite insertion
 2. Add to Hermes config via `hermes config set custom_providers` (include ALL existing!)
 3. For paid providers, check quota on their dashboard — agent cannot check
 
@@ -217,6 +322,36 @@ See `references/free-providers.md` for full comparison (Cerebras, Groq, Gemini, 
 
 **Quick picks**: Cerebras (fastest ~2000 tok/sec) → Groq (best free limits) → Gemini (instant key, strongest models).
 
+## FreeLLMAPI Fallback Architecture (Confirmed 2026-06-08)
+
+FreeLLMAPI has a **complete built-in fallback system** — no external retry logic needed.
+
+**Source**: `/opt/freellmapi/server/dist/services/router.js` + `routes/proxy.js`
+
+| Mechanism | Detail |
+|-----------|--------|
+| Retry loop | `MAX_RETRIES = 20` — tries up to 20 different model+key combos per request |
+| Rate limit detection | `isRetryableError()` catches 429, 503, 500, 413, 404, timeout, connection errors |
+| Cooldown | Failed model+key put on cooldown (duration from `getCooldownDurationForLimit`) |
+| Penalty system | Each 429 adds +3 penalty to model priority (max 10). Penalty decays every 2 min. |
+| Key round-robin | Multiple keys per platform are rotated via `roundRobinIndex` |
+| Sticky sessions | Same conversation stays on same model (30-min TTL, keyed by first user message hash) |
+| Skip tracking | `skipKeys` set tracks failed `platform:modelId:keyId` combos within a single request |
+| IP rate limit | 120 req/min per IP (in-memory, `PROXY_RATE_LIMIT_RPM` to adjust, `0` to disable) |
+
+**CRITICAL LIMITATION**: Fallback is per-model, but ALL models on the same platform share the same key(s). If OpenRouter key hits rate limit, ALL ~40 OpenRouter models fail together. **Solution**: Add multiple keys per platform, or add more providers with separate free keys.
+
+**upstream vs IP rate limit**: After disabling IP rate limit (`PROXY_RATE_LIMIT_RPM=0`), you may still see 429 errors. These are from the **upstream provider** (OpenRouter, NVIDIA, etc.), not FreeLLMAPI. Verify by checking response body — upstream 429 includes provider-specific headers, FreeLLMAPI IP 429 says "Rate limit exceeded: more than N requests per minute".
+
+**DB paths**:
+- Actual data: `/opt/freellmapi/server/data/freeapi.db` (NOT `dist/db/freellmapi.db` which is empty)
+- Schema: `api_keys`, `models`, `fallback_config`, `rate_limit_cooldowns`, `rate_limit_usage`, `requests`, `sessions`, `settings`
+
+**Key insight**: If FreeLLMAPI returns 429 "All models exhausted", the issue is upstream provider keys — not the fallback logic. Add more keys via admin API or direct SQLite insertion.
+
+See `references/pm2-env-gotchas.md` for PM2 env management (critical — `pm2 set` can wipe ENCRYPTION_KEY).
+
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -235,14 +370,24 @@ See `references/free-providers.md` for full comparison (Cerebras, Groq, Gemini, 
 | NVIDIA NIM 403 Forbidden | Model is enterprise-only; use free-tier models (qwen3-coder-480b, deepseek-v4-flash) |
 | NVIDIA NIM signup hCaptcha | Cannot automate from AWS IP; user signs up on own device |
 | NVIDIA NIM cold start timeout | Large models (675B+) take 60s+ first request; use smaller models or pre-warm |
+| FreeLLMAPI 429 "All models exhausted" | Add more provider keys; check key health in dashboard |
+| FreeLLMAPI chat returns "Service Unavailable" | Provider endpoint down; check if WARP proxy needed for that region |
+| execute_code subprocess blocked | Use `terminal()` instead; `execute_code` blocks subprocess.run() |
+| WARP exit region won't change | Disconnect/reconnect keeps same nearest exit node; need different proxy for region change |
+| PM2 restart wrong process | `pm2 restart <id>` targets by ID not name — verify with `pm2 list` first |
+| FreeLLMAPI key insert fails from /tmp | Must run from `/opt/freellmapi/server` (node_modules path) |
+| IP rate limit blocks all requests | Wait 2+ min for 120 req/min window to reset; set `PROXY_RATE_LIMIT_RPM=0` to disable (via ecosystem file, NOT `pm2 set`) |
+| FreeLLMAPI 401 after restart | ENCRYPTION_KEY wiped — `pm2 set` replaces ENTIRE env. Fix: use ecosystem.config.cjs with ENCRYPTION_KEY in env block. See PM2 Env section below. |
+| Shell `***` glob expansion | Tokens with `***` expanded by bash glob. ALWAYS use Python (urllib/request) for API calls with secrets, NEVER inline curl with `Bearer ***` in shell. |
+| 429 after IP rate limit disabled | Upstream provider rate limit (OpenRouter key), not FreeLLMAPI. Add more keys from different providers. |
 
 See `references/pitfalls.md` for extended troubleshooting.
 
-## Current Setup (as of 2026-06-06)
+## Current Setup (as of 2026-06-08)
 
 | Service | Port | Manager | Models |
 |---------|------|---------|--------|
-| FreeLLMAPI | 3001 | systemd | 102 models (aggregated) |
+| FreeLLMAPI | 3001 | PM2 | 102 models (aggregated) |
 | OpenCode Proxy | 19912 | PM2 | 45 models |
 | 9Router | 20128 | systemd | Unified dashboard + combo fallback |
 | NVIDIA NIM | — | cloud | Free-tier serverless (qwen3-coder-480b, deepseek-v4-flash, kimi-k2.6) |
@@ -253,6 +398,16 @@ See `references/pitfalls.md` for extended troubleshooting.
 **9Router API Key**: `9r-...` (stored in `.env` as `NINEROUTER_API_KEY`)
 **9Router Dashboard**: via Cloudflare tunnel (URL in tunnel log)
 **Admin**: admin@freellmapi.local / admin123
+
+**FreeLLMAPI registered keys (6 total)**:
+| # | Platform | Label | Status |
+|---|----------|-------|--------|
+| 1 | openrouter | OpenRouter Main | healthy |
+| 2 | custom | chat.b.ai key 1 | unknown |
+| 3 | custom | chat.b.ai key 2 | unknown |
+| 4 | custom | opencode-free-proxy | unknown |
+| 5 | nvidia | nvidia-direct | unknown |
+| 6 | openrouter | openrouter-direct | unknown |
 
 **Note**: User cannot check API key balances from Hermes session. Direct them to provider dashboards.
 
