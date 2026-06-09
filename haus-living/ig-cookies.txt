@@ -1,0 +1,15 @@
+# Netscape cookies.txt — Instagram
+# Generated from browser export
+# DO NOT SHARE
+
+.instagram.com	TRUE	/	TRUE	1815468368	ps_n	1
+.instagram.com	TRUE	/	TRUE	1815468311	datr	F4EmavSc1pLWCmmDrLDpr15r
+.instagram.com	TRUE	/	TRUE	1788684947	ds_user_id	60988187971
+.instagram.com	TRUE	/	TRUE	1815468947	csrftoken	Y41B8YVBxX3ChwrXqxzFfa0Re2iAfHdm
+.instagram.com	TRUE	/	TRUE	1812444311	ig_did	900026FC-2AC7-4E93-B45E-81AE5F71B46B
+.instagram.com	TRUE	/	TRUE	1815468368	ps_l	1
+.instagram.com	TRUE	/	TRUE	1781513749	wd	980x1782
+.instagram.com	TRUE	/	TRUE	1815468311	mid	aiaBFwAEAAHTh41yvwg4rIRoH9Uz
+.instagram.com	TRUE	/	TRUE	1812444387	sessionid	60988187971%3AyabAnWVzqS0sGx%3A8%3AAYjFwkTj48uNfdPYtvizbXAMz54V2gjCPZG1BSCfMw
+.instagram.com	TRUE	/	TRUE	1781513749	dpr	2.4
+.instagram.com	TRUE	/	TRUE	1812444947	rur	"HIL\05460988187971\0541812444947:01ff29a1e8e15cba12db0c4b04d9a08f952ada5bffd7fc4698a650e523c26de3db9e3a6c"

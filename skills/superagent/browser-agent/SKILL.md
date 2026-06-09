@@ -284,11 +284,138 @@ Same cookies via x_tool.py → whoami, profile, post, search, timeline ALL work
 Always check `window.location.href` when page appears empty:
 - `about:blank` = session was killed (IP block, rate limit, or bot detection)
 - Normal URL but empty content = rendering issue, try `document.body.innerText`
+- Some extensions ship platform-specific binaries or expect a signed install;
+  most wallet/helper extensions load fine unpacked, a few may warn.
 
-If `about:blank`, the session is dead — navigate to a fresh URL or restart context.
+## Extension ID vs Web Store ID — common gotcha
+
+The **Web Store ID** (e.g. MetaMask = `nkbihfbeogaeaoehlefnkodbefgpgknn`) is NOT
+the same as the **extension ID** in `chrome-extension://` URLs
+(e.g. MetaMask = `lcpmajdcaiedieelpghcmgnoonbeokgg`). The extension ID is derived
+from the public key in the CRX header and is stable across installs.
+
+- When loading by **folder path** (recommended): use the unpacked folder directly
+  via `extension_paths=["~/.wallets/metamask-unpacked"]` — no ID needed.
+- When referencing extension pages: use `chrome-extension://<ext_id>/home.html` —
+  the `ext_id` comes from the loaded extension's service worker URL, NOT the Web Store ID.
+- To find the `ext_id`: check `ctx.service_workers` after launch, or read the
+  `key` field in the extension's `manifest.json` (if present).
+
+## Wallet File Locations (CUPANG environment)
+
+| File | Format | Chain | Status |
+|------|--------|-------|--------|
+| `~/.hermes/sol-wallets.json` | Plaintext JSON (public + secret base58) | Solana | ✅ Readable |
+| `~/.hermes/wallets.enc` | Fernet encrypted (Scrypt KDF, 16-byte salt header) | EVM | 🔒 Password lost |
+
+**CRITICAL**: `sol-wallets.json` contains Solana keypairs — these are **NOT** compatible with MetaMask (EVM-only). To use these, import into Phantom or Solflare.
+
+**CRITICAL PITFALL**: `wallets.enc` master password was lost because the agent created the vault but never communicated the password to the user. **ALWAYS** save the master password in a known credential file (`~/.hermes/accounts.env` or similar) or communicate it to the user immediately after creation. An encrypted vault with a lost password is worse than no vault at all.
+
+## MetaMask MV3 Headless Automation — Known Limitations (2026-06-08)
+
+MetaMask MV3 in CloakBrowser has **hard limits** for headless automation:
+
+| Issue | Symptom | Workaround |
+|-------|---------|------------|
+| **LavaMoat scuttling** | `page.evaluate()` throws "property inaccessible under scuttling mode" | Use `ctx.service_workers[0].evaluate()` instead of page evaluate |
+| **Popup page crash** | `TargetClosedError` when opening `popup.html` or `popup-init.html` in headless | Don't use popup UI; inject state via `chrome.storage.local` |
+| **SPA doesn't render** | `home.html` shows loading spinner forever, 0 buttons/inputs found | SPA JS execution blocked in headless; use CDP `Runtime.evaluate` for limited access |
+| **Controllers not global** | `KeyringController`, `OnboardingController` not in `self` scope | Controllers are webpack-encapsulated; access state only via `chrome.storage.local` |
+| **No webpack require** | Can't find `webpackRequire` in service worker global scope | MV3 service worker doesn't expose module system; use `chrome.storage.local` directly |
+
+### What WORKS in headless:
+```python
+# Access service worker
+workers = ctx.service_workers
+w = workers[0]
+
+# Read/write MetaMask state via chrome.storage.local
+kc = await w.evaluate("chrome.storage.local.get('KeyringController')")
+oc = await w.evaluate("chrome.storage.local.get('OnboardingController')")
+
+# Mark onboarding complete (but vault still needs to be created separately)
+await w.evaluate("""
+(async () => {
+    const oc = await chrome.storage.local.get('OnboardingController');
+    const o = oc.OnboardingController || {};
+    o.completedOnboarding = true;
+    o.firstTimeFlowType = 'import';
+    o.seedPhraseBackedUp = true;
+    await chrome.storage.local.set({OnboardingController: o});
+})()
+""")
+```
+
+### What does NOT work:
+- DOM-based UI interaction (buttons, inputs, forms) in headless
+- `page.query_selector_all()` on MetaMask popup pages
+- `page.screenshot()` after MetaMask page loads (crashes context)
+- Direct controller method calls (controllers not in global scope)
+- Creating a valid encrypted vault from outside MetaMask (format is internal)
+
+### Recommended approach for wallet import:
+1. **Use non-headless mode** (`headless=False`) with Xvfb for GUI rendering
+2. **Or use MetaMask's onboarding flow** in a real browser session (not automated)
+3. **Or inject pre-computed vault** — but requires knowing MetaMask's exact encryption format
+
+### Storage structure (confirmed):
+- `KeyringController`: `{vault: "<encrypted>", keyrings: [], isUnlocked: false}` — empty `{}` on fresh profile
+- `OnboardingController`: `{completedOnboarding: false, firstTimeFlowType: null, seedPhraseBackedUp: false}`
+- `PreferencesController`: `{forgottenPassword: false, ...}`
+- Full list of 60+ controller keys available via `chrome.storage.local.get(null)`
+
+## MetaMask installation — confirmed working pattern (2026-06-08)
+
+| Field | Value |
+|-------|-------|
+| Web Store ID | `nkbihfbeogaeaoehlefnkodbefgpgknn` |
+| Extension ID | `lcpmajdcaiedieelpghcmgnoonbeokgg` |
+| Version (at time of writing) | 13.34.0.0 |
+| Manifest version | 3 (service worker) |
+| Min Chrome | 115 |
+
+Download CRX3 + unpack to load in CloakBrowser:
+
+```python
+import urllib.request, zipfile, io, os
+
+def download_and_unpack_metamask(dest="~/.wallets/metamask-unpacked"):
+    url = ("https://clients2.google.com/service/update2/crx"
+           "?response=redirect&acceptformat=crx2,crx3&prodversion=146.0.0"
+           "&x=id%3Dnkbihfbeogaeaoehlefnkodbefgpgknn%26uc")
+    _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+           "(KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36")
+    req = urllib.request.Request(url, headers={"User-Agent": _UA})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        raw = resp.read()
+    hdr_len = int.from_bytes(raw[8:12], "little")  # CRX3 protobuf header
+    zip_off = 12 + hdr_len
+    dest = os.path.expanduser(dest)
+    os.makedirs(dest, exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(raw[zip_off:])) as z:
+        z.extractall(dest)
+    return dest
+
+# Load in CloakBrowser
+from cloakbrowser import launch_persistent_context_async
+os.environ["CLOAKBROWSER_AUTO_UPDATE"] = "false"
+ctx = await launch_persistent_context_async(
+    user_data_dir="~/.agent/browser-profile",
+    headless=True,  # False for dApp/MetaMask onboarding
+    extension_paths=[download_and_unpack_metamask()],
+    viewport={"width": 1280, "height": 900},
+    args=["--headless=new"],
+)
+# Open MetaMask UI
+page = await ctx.new_page()
+await page.goto("chrome-extension://lcpmajdcaiedieelpghcmgnoonbeokgg/home.html",
+                wait_until="networkidle")
+```
 
 ## Utility scripts
 
+- `scripts/download_metamask.py` — Download MetaMask CRX3 from Chrome Web Store and unpack to `~/.wallets/metamask-unpacked`. Run once; reuse the folder via `extension_paths`.
 - `scripts/cc_gen.py` — Generate Luhn-valid dummy credit card numbers from a BIN.
   Useful for testing payment forms. Usage: `python3 cc_gen.py [BIN] [COUNT]`
 
@@ -404,6 +531,10 @@ await cdp.send('Emulation.setDeviceMetricsOverride', {
 - For social media login from VPS: CDP works, **but the SPA must render** → requires residential proxy
 
 → **Full CDP reference**: `references/cdp-protocol.md` (domains, stealth JS, QID extraction pattern, tested capabilities, limitations)
+
+## MetaMask MV3 Headless — Quick Reference
+
+MetaMask MV3 in headless mode has hard limits: LavaMoat scuttling blocks DOM access, popup pages crash, SPA doesn't render. **Service worker access via `ctx.service_workers[0].evaluate()` works** for `chrome.storage.local` read/write. See `references/metamask-mv3-headless.md` for full details, confirmed working patterns, and recommended approaches.
 
 ## Credential Safety
 

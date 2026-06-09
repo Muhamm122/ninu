@@ -641,6 +641,13 @@ def load_registry(master_password: str) -> dict:
 
 ## Constraints
 
+- **On-Chain Task Protocol (from SOUL.md — always active):**
+  1. **Verifikasi sebelum execute** — cek contract address, token, amount, chain ID. Jangan assume.
+  2. **Dry-run / simulate dulu** — `wallet.call(tx)` sebelum broadcast. Kalau simulate revert, jangan push.
+  3. **Screenshot bukti** — capture tx confirmation screen atau tx hash setelah broadcast.
+  4. **Cek tx hash di explorer** — konfirmasi tx success (status=1), bukan cuma "submitted."
+  5. **Jangan pernah fabricate tx hash atau status** — kalau gagal, report gagal. Jangan claim success tanpa bukti explorer.
+  6. **Estimasi gas wajib dicek** — kalau gas fee abnormal tinggi (>2x usually), alert sebelum proceed.
 - ALWAYS simulate before broadcasting on mainnet
 - Use `pending` nonce on parallel sends
 - RPC fallback list, never a single endpoint for production

@@ -29,6 +29,18 @@ FALLBACK4: OpenCode Proxy (:19912) — FREE, 45 models
 
 **Cost optimization**: Use MiMo for heavy reasoning tasks. Use NVIDIA NIM (`qwen3-coder-480b` ~350ms TTFT, or `deepseek-v4-flash`) for fast coding tasks. Use FreeLLMAPI for everything else free.
 
+**MiMo models** (confirmed 2026-06-08):
+| Model | Type | Notes |
+|-------|------|-------|
+| `mimo-v2.5-pro` | Chat | Best reasoning, 128k context |
+| `mimo-v2.5` | Chat | Base model |
+| `mimo-v2-pro` | Chat | Previous gen |
+| `mimo-v2-omni` | Multimodal | Vision + chat |
+| `mimo-v2.5-tts` | TTS | Text-to-speech |
+| `mimo-v2.5-asr` | ASR | Speech recognition |
+
+**MiMo key format**: `tp-...` (40+ chars). Base URL: `https://token-plan-sgp.xiaomimimo.com/v1`
+
 **NVIDIA NIM free-tier models (tested 2026-06-06)**:
 | Model | Status | Notes |
 |-------|--------|-------|
@@ -220,6 +232,7 @@ See `references/2026-06-08-keys-fallback.md` for detailed session notes.
 **Provider base URLs:**
 | Provider | Base URL |
 |----------|----------|
+| MiMo | `https://token-plan-sgp.xiaomimimo.com/v1` |
 | Groq | `https://api.groq.com/openai/v1` |
 | Cerebras | `https://api.cerebras.ai/v1` |
 | Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` |
@@ -352,6 +365,79 @@ FreeLLMAPI has a **complete built-in fallback system** — no external retry log
 See `references/pm2-env-gotchas.md` for PM2 env management (critical — `pm2 set` can wipe ENCRYPTION_KEY).
 
 
+## ⚠️ CRITICAL: Provider Platform Routing
+
+FreeLLMAPI registers built-in providers with **hardcoded base URLs**. Only the `custom` platform reads `base_url` from the `api_keys` DB row.
+
+| Platform | Hardcoded Base URL | Uses DB base_url? |
+|----------|-------------------|-------------------|
+| `openrouter` | `https://openrouter.ai/api/v1` | ❌ No |
+| `opencode` | `https://opencode.ai/zen/v1` | ❌ No |
+| `nvidia` | `https://integrate.api.nvidia.com/v1` | ❌ No |
+| `groq` | `https://api.groq.com/openai/v1` | ❌ No |
+| `custom` | *(from api_keys.base_url)* | ✅ Yes |
+| `kilo` | `https://api.kilo.ai/api/gateway/v1` | ❌ No |
+
+**Implication**: To route models through a **local proxy** (e.g. OpenCode proxy at `localhost:19912`):
+1. Set the model's platform to `custom` (NOT `opencode`)
+2. Set the API key's platform to `custom`
+3. Set the key's `base_url` to `http://localhost:19912/v1`
+4. Re-encrypt the key with the **correct** ENCRYPTION_KEY (see below)
+
+```sql
+-- Fix: change model platform from 'opencode' to 'custom'
+UPDATE models SET platform='custom' WHERE platform='opencode';
+-- Fix: change key platform + set base_url
+UPDATE api_keys SET platform='custom', base_url='http://localhost:19912/v1' WHERE id=4;
+```
+
+**Symptom**: FreeLLMAPI returns 502 "Provider error (X): API error 401: Invalid API key" even though the key works directly. Or returns 429 "All models exhausted" because no matching key exists for the model's platform.
+
+**Verification**: After fix, `curl` test should return the model from the local proxy, NOT a fallback model from OpenRouter. Check `result.model` in response — if it's `openai/gpt-oss-120b:free` when you requested `mimo-v2.5-free`, the routing fell back to OpenRouter (platform mismatch still).
+
+## ⚠️ CRITICAL: ENCRYPTION_KEY Dual Source
+
+The ENCRYPTION_KEY may differ between:
+- **systemd service**: `/etc/systemd/system/freellmapi.service` → `Environment=ENCRYPTION_KEY=...`
+- **ecosystem config**: `/opt/freellmapi/ecosystem.config.cjs` → `env.ENCRYPTION_KEY`
+
+**Always check which one the RUNNING service uses** before re-encrypting keys:
+
+```bash
+# Check systemd key
+grep ENCRYPTION_KEY /etc/systemd/system/freellmapi.service
+
+# Check ecosystem key
+grep ENCRYPTION_KEY /opt/freellmapi/ecosystem.config.cjs
+```
+
+If they differ, the systemd key wins (FreeLLMAPI runs via systemd in production). Re-encrypt with the systemd key:
+
+```bash
+node -e "
+const crypto = require('crypto');
+const ENCRYPTION_KEY = '<systemd-key-here>';
+const key = Buffer.from(ENCRYPTION_KEY, 'hex');
+const iv = crypto.randomBytes(16);
+const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+let encrypted = cipher.update('dummy-key-not-needed', 'utf8', 'hex');
+encrypted += cipher.final('hex');
+const authTag = cipher.getAuthTag().toString('hex');
+console.log(JSON.stringify({encrypted, iv: iv.toString('hex'), authTag}));
+"
+```
+
+Then update DB:
+```python
+import sqlite3
+db = sqlite3.connect('/opt/freellmapi/server/data/freeapi.db')
+db.execute("UPDATE api_keys SET encrypted_key=?, iv=?, auth_tag=?, status='healthy' WHERE id=?",
+           (encrypted, iv, auth_tag, key_id))
+db.commit()
+```
+
+**Restart**: `sudo systemctl restart freellmapi` (NOT `pm2 restart` — it runs via systemd).
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -370,7 +456,9 @@ See `references/pm2-env-gotchas.md` for PM2 env management (critical — `pm2 se
 | NVIDIA NIM 403 Forbidden | Model is enterprise-only; use free-tier models (qwen3-coder-480b, deepseek-v4-flash) |
 | NVIDIA NIM signup hCaptcha | Cannot automate from AWS IP; user signs up on own device |
 | NVIDIA NIM cold start timeout | Large models (675B+) take 60s+ first request; use smaller models or pre-warm |
-| FreeLLMAPI 429 "All models exhausted" | Add more provider keys; check key health in dashboard |
+| FreeLLMAPI 429 "All models exhausted" | Add more provider keys; check key health in dashboard. **Also check platform mismatch**: model platform must match key platform. If model is `opencode` but key is `custom` (or vice versa), no key is found. |
+| FreeLLMAPI 502 "Invalid API key" for local proxy | Platform mismatch or wrong ENCRYPTION_KEY. Model+key must both be `custom` platform. Re-encrypt key with systemd's ENCRYPTION_KEY (not ecosystem's). See Provider Platform Routing section. |
+| FreeLLMAPI returns fallback model instead of requested | Model routing fell back to OpenRouter — the model's platform doesn't match any key's platform. Check: `SELECT platform FROM models WHERE model_id='X'` vs `SELECT platform FROM api_keys WHERE enabled=1`. |
 | FreeLLMAPI chat returns "Service Unavailable" | Provider endpoint down; check if WARP proxy needed for that region |
 | execute_code subprocess blocked | Use `terminal()` instead; `execute_code` blocks subprocess.run() |
 | WARP exit region won't change | Disconnect/reconnect keeps same nearest exit node; need different proxy for region change |
@@ -379,6 +467,8 @@ See `references/pm2-env-gotchas.md` for PM2 env management (critical — `pm2 se
 | IP rate limit blocks all requests | Wait 2+ min for 120 req/min window to reset; set `PROXY_RATE_LIMIT_RPM=0` to disable (via ecosystem file, NOT `pm2 set`) |
 | FreeLLMAPI 401 after restart | ENCRYPTION_KEY wiped — `pm2 set` replaces ENTIRE env. Fix: use ecosystem.config.cjs with ENCRYPTION_KEY in env block. See PM2 Env section below. |
 | Shell `***` glob expansion | Tokens with `***` expanded by bash glob. ALWAYS use Python (urllib/request) for API calls with secrets, NEVER inline curl with `Bearer ***` in shell. |
+| MiMo 401 Invalid Key | Wrong base URL — use `https://token-plan-sgp.xiaomimimo.com/v1` (NOT `api.mimo.ai`). Test with Python urllib, not curl inline. |
+| MiMo empty content | `reasoning_content` has text but `content` is empty — reduce `max_tokens` or lower `temperature` to ~0.1. |
 | 429 after IP rate limit disabled | Upstream provider rate limit (OpenRouter key), not FreeLLMAPI. Add more keys from different providers. |
 
 See `references/pitfalls.md` for extended troubleshooting.
@@ -387,12 +477,13 @@ See `references/pitfalls.md` for extended troubleshooting.
 
 | Service | Port | Manager | Models |
 |---------|------|---------|--------|
-| FreeLLMAPI | 3001 | PM2 | 102 models (aggregated) |
+| FreeLLMAPI | 3001 | **systemd** | 102 models (aggregated) |
 | OpenCode Proxy | 19912 | PM2 | 45 models |
 | 9Router | 20128 | systemd | Unified dashboard + combo fallback |
 | NVIDIA NIM | — | cloud | Free-tier serverless (qwen3-coder-480b, deepseek-v4-flash, kimi-k2.6) |
-| Hermes Gateway | — | systemd | 6+ providers (MiMo, NVIDIA, OpenRouter, FreeLLMAPI, OpenCode, 9Router) |
+| Hermes Gateway | — | systemd | 7+ providers (MiMo, NVIDIA, OpenRouter, FreeLLMAPI, OpenCode, 9Router) |
 
+**MiMo API Key**: `tp-s498deb...` (stored in Hermes config)
 **FreeLLMAPI Key**: `freellmapi-3f3ae86521eba8c49ec39d2380a632833b544bd927b3fde0`
 **NVIDIA NIM Key**: `nvapi-...` (stored in Hermes config)
 **9Router API Key**: `9r-...` (stored in `.env` as `NINEROUTER_API_KEY`)
@@ -405,7 +496,7 @@ See `references/pitfalls.md` for extended troubleshooting.
 | 1 | openrouter | OpenRouter Main | healthy |
 | 2 | custom | chat.b.ai key 1 | unknown |
 | 3 | custom | chat.b.ai key 2 | unknown |
-| 4 | custom | opencode-free-proxy | unknown |
+| 4 | custom | opencode-free-proxy | healthy |
 | 5 | nvidia | nvidia-direct | unknown |
 | 6 | openrouter | openrouter-direct | unknown |
 

@@ -262,6 +262,20 @@ import { motion } from 'framer-motion';
 
 ---
 
+## Telegram Mini App (React + Vite + Express)
+
+Full deployment guide: see `superagent-infra` skill → `references/hermes-miniapp-deploy.md`
+
+Key architecture: React 19 + Vite frontend, Express backend serving API + static from `dist/`, PM2 process manager, nginx reverse proxy on subpath. Template: `https://github.com/waguriagentic/hermes-miniapp-template`
+
+Quick steps:
+1. Clone template → `npm install` (frontend) + `cd server && npm install` (backend)
+2. Customize pages in `src/pages/`, add tab in `App.tsx`
+3. Build: `npx vite build` (skip `tsc -b` — it hangs). Run with `background=true`
+4. PM2: `pm2 start server/index.js --name miniapp && pm2 save`
+5. Nginx: inject `location /miniapp/` block with `proxy_pass http://127.0.0.1:9122/;` (trailing slash strips prefix)
+6. API base: auto-detect in `api.ts` via `window.location.pathname` for both direct + proxy access
+
 ## Distribution Sequences
 
 ```bash

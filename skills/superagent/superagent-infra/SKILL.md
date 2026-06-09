@@ -473,7 +473,9 @@ ssh ubuntu@NEW_IP "tar -xzf archive.tar.gz && bash haus-backup-*/restore.sh"
 - Bot tokens — Hermes auto-masks them; user sets manually on new VPS
 - Hermes binary — reinstalled during restore
 
-See `references/vps-backup-restore.md` for full script templates (backup.sh + restore.sh).
+See `references/hermes-miniapp-deploy.md` for deploying React+Vite+Express Telegram Mini Apps behind nginx subpath.
+See `references/9router-db-reference.md` for 9Router SQLite DB schema, queries, and key management rules.
+See `references/vps-backup-restore.md` for full script templates.
 See `references/freellmapi-key-management.md` for adding API keys, version checks, and fallback chain details.
 See `scripts/health-monitor.py` for a ready-to-use multi-service health checker (systemd + PM2 + Docker + resource alerts).
 

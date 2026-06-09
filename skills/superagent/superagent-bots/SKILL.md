@@ -751,6 +751,104 @@ scripts/tg_user.py
 
 Set `TG_API_ID`, `TG_API_HASH`, `TG_PHONE` env vars. Run `tg_user.py init` first time, then `tg_user.py dialogs`, `tg_user.py read CHAT_ID 10`, etc.
 
+## Telegram Mini App (Web App) Setup
+
+Mini Apps are web apps that open inside Telegram. They require HTTPS and are configured via Bot API.
+
+### Key constraint: HTTPS ONLY
+Telegram rejects HTTP URLs for Mini Apps: `"Only HTTPS links are allowed"`. You MUST have:
+- A domain with SSL (Let's Encrypt / Cloudflare), OR
+- A Cloudflare Tunnel (`cloudflared tunnel --url http://localhost:PORT`)
+
+### Programmatic Menu Button Setup (Bot API)
+
+No need to go through @BotFather UI. Use `setChatMenuButton`:
+
+```python
+import urllib.request, json
+
+TOKEN = "bot_token_here"
+
+# Set default menu button for ALL chats
+url = f"https://api.telegram.org/bot{TOKEN}/setChatMenuButton"
+data = json.dumps({
+    "menu_button": {
+        "type": "web_app",
+        "text": "🚀 Open App",
+        "web_app": {"url": "https://your-domain.com/app/"}
+    }
+}).encode()
+req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+urllib.request.urlopen(req, timeout=15)
+
+# Set for specific user only
+data2 = json.dumps({
+    "chat_id": USER_CHAT_ID,
+    "menu_button": {
+        "type": "web_app",
+        "text": "🚀 Open App",
+        "web_app": {"url": "https://your-domain.com/app/"}
+    }
+}).encode()
+```
+
+**Verify:** `getChatMenuButton?chat_id=USER_ID` returns the configured button.
+
+### Mini App Architecture (React + Express + nginx)
+
+```
+Frontend:  React + Vite + TypeScript → dist/
+Backend:   Express (API + static serving from dist/)
+Process:   PM2 (auto-restart)
+Proxy:     nginx location /app/ → http://127.0.0.1:PORT/
+```
+
+**Nginx location block:**
+```nginx
+location /app/ {
+    proxy_pass http://127.0.0.1:9122/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+### API Base URL Auto-Detection
+
+When serving behind nginx path prefix, auto-detect in frontend:
+
+```typescript
+// src/lib/api.ts
+export function getApiBase(): string {
+  const stored = localStorage.getItem('api_base');
+  if (stored) return stored;
+  // Auto-detect: if served from /app/*, use that prefix
+  const path = window.location.pathname;
+  if (path.startsWith('/app')) return '/app';
+  return ''; // direct access (dev or direct port)
+}
+```
+
+### Telegram Mini App Template
+
+Template repo: `https://github.com/waguriagentic/hermes-miniapp-template`
+- React 19 + Vite + TypeScript frontend
+- Express backend (API + static serving)
+- Tab navigation (primary + "More" bottom sheet)
+- Dark/light theme
+- Toast notifications
+
+For full deployment guide (nginx subpath, Cloudflare Tunnel + PM2, watchdog cron, token extraction), see `references/telegram-miniapp.md`.
+
+### Pitfalls
+
+- **`tsc -b` hangs during build** — TypeScript compilation can hang on VPS with limited resources. Fix: run `npx vite build` directly (skips type checking). For production CI, add `"skipLibCheck": true` to tsconfig.
+- **Bot token in shell gets `***` corrupted** — Use Python `urllib.request` for Telegram API calls, not `curl`. Shell glob `***` expands and corrupts tokens.
+- **`setChatMenuButton` requires HTTPS** — HTTP URLs return 400: "Only HTTPS links are allowed"
+- **Reverse proxy path mismatch** — If frontend calls `/api/health` but nginx proxies `/app/` → backend `/`, the API base must be `/app` not empty. Use auto-detection above.
+- **PM2 env update** — `pm2 set` replaces ENTIRE env. Only use ecosystem `.config.cjs` for env vars.
+
 ### File Sending
 
 For sending local files (PDF, ZIP, images, etc.) to Telegram via Bot API, use the `telegram-file-sender` skill + `tg_file_sender.py` tool. This handles the Hermes cache directory requirement (files must be under `~/.hermes/cache/` or the gateway silently drops them).
@@ -764,6 +862,16 @@ See `telegram-file-sender` skill for full details.
 ### Task Tracker Reference
 
 See `references/task-tracker.md` for the full FastAPI + SQLite + Telethon bot architecture deployed alongside Haus Living API.
+
+### Fake Data Generation
+
+See `scripts/dummy_data_match.py` for generating fake Indonesian identities with matching CC data (NIK, name, address, email, phone, CC — all consistent per person). Usage:
+
+```bash
+python3 scripts/dummy_data_match.py 10  # Generate 10 identities
+```
+
+Output: JSON file with complete person + CC data. All CC numbers pass Luhn check. Cardholder name matches the person's name.
 
 ---
 
