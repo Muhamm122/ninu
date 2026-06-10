@@ -37,12 +37,23 @@ cp "$HERMES_DIR/QUICKREF.md" superagent-core/ 2>/dev/null || true
 cp "$HERMES_DIR/INDEX.md" superagent-core/ 2>/dev/null || true
 cp "$HERMES_DIR/CONTRIBUTORS.md" superagent-core/ 2>/dev/null || true
 
-# 2. Sync skills (rsync for efficiency)
-log "🧠 Syncing skills..."
-rsync -a --delete "$HERMES_DIR/skills/superagent/" skills/superagent/ 2>/dev/null || true
-rsync -a --delete "$HERMES_DIR/skills/captcha-bypass/" skills/captcha-bypass/ 2>/dev/null || true
+# 2. Sync ALL skills (not just superagent and captcha-bypass)
+log "🧠 Syncing all skills..."
+rsync -a --delete "$HERMES_DIR/skills/" skills/ 2>/dev/null || true
 
-# 3. Sync haus-living (exclude secrets and large binaries)
+# 3. Sync memory files
+log "💾 Syncing memory files..."
+mkdir -p hermes-data/memory
+cp "$HERMES_DIR/memory/"*.md hermes-data/memory/ 2>/dev/null || true
+cp "$HERMES_DIR/memory/"*.json hermes-data/memory/ 2>/dev/null || true
+
+# 4. Sync custom scripts
+log "📜 Syncing custom scripts..."
+mkdir -p hermes-data/scripts
+cp "$HERMES_DIR/scripts/"*.py hermes-data/scripts/ 2>/dev/null || true
+cp "$HERMES_DIR/scripts/"*.sh hermes-data/scripts/ 2>/dev/null || true
+
+# 5. Sync haus-living (exclude secrets and large binaries)
 log "🏠 Syncing haus-living..."
 rsync -a --delete \
     --exclude='secrets/' \
@@ -52,25 +63,27 @@ rsync -a --delete \
     --exclude='*.tar.gz' \
     "$HERMES_DIR/haus-living/" haus-living/ 2>/dev/null || true
 
-# 4. Sync x-actions
+# 6. Sync x-actions
 log "🐦 Syncing x-actions..."
 rsync -a --delete "$X_ACTIONS_DIR/" x-actions/ 2>/dev/null || true
 
-# 5. Sync tools
+# 7. Sync tools
 log "🛠️ Syncing tools..."
 cp "$HERMES_DIR/skills/superagent/tools/"*.py tools/ 2>/dev/null || true
 
-# 6. Check for changes
+# 8. Check for changes
 CHANGES=$(git status --porcelain | wc -l)
 log "📊 Changes detected: $CHANGES files"
 
 if [ "$CHANGES" -gt 0 ]; then
-    # 7. Commit and push
+    # 9. Commit and push
     git add -A
     git commit -m "Auto-sync: $(date '+%Y-%m-%d %H:%M') — $CHANGES files updated
 
 - Core files synced from ~/.hermes/
-- Skills synced (37 skills)
+- All skills synced (37+ skills)
+- Memory files synced
+- Custom scripts synced (stock_complete.py, stock_chart.py, stock_deep.py)
 - Haus Living assets synced
 - X Actions synced
 - Tools synced" 2>&1 | tail -3
