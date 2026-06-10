@@ -921,6 +921,7 @@ fi
 - Executable commands only — no illustrative pseudocode
 - Inline comment on every non-obvious instruction
 - Include rollback or recovery step for destructive ops
+- **Scope deletions precisely**: When user asks to delete category A, do NOT also delete related-but-different category B without explicit confirmation. Example: user asked to remove miniapp data — cloakbrowser was a separate tool that should not have been touched. When in doubt, ask before extending the scope of a destructive operation.
 - Mark sudo requirement explicitly
 - Specify which process supervisor (pm2/systemd/screen) per scenario
 - Never `chmod 777` unless explicitly justified

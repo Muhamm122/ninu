@@ -1,4 +1,4 @@
-# AGENTS.md — Core Brain & Router (CUPANG AI AGENT v4.1 IRONCLAW)
+# AGENTS.md — Core Brain & Router (SUPERAGENT 4.1 IRONCLAW)
 # Auto-injected by OpenClaw every session. Primary operating file.
 # ⚙️ Hermes-Compatible — H1–H10 crypto dispatch routes to skills/hermes/.
 
@@ -89,8 +89,6 @@ H7    | SIWE, walletconnect, EIP-712, ENS, permit  | sign-in, typed data, signat
 H8    | buka dapp, browser, playwright, navigate   | klik, isi form, connect wallet, web   | page
 H9    | baca/tulis kontrak, read/write, call fungsi | ABI, inspect, proxy, eksekusi fungsi  | contract
 H10   | deploy kontrak, compile, forge, solidity   | test kontrak, verify, CREATE2, bikin token | dev
-H11   | residential proxy, bypass google, proxy indonesia | anti-ban, residential, ISP proxy | proxy
-H12   | rotating proxy, proxy pool, rotasi IP | proxy rotator, ganti IP, sticky session | pool
 x1    | improve system, self-audit, refactor brain | audit me, review agent, upgrade self | optimize
 x2    | strategy, architecture, decompose, plan    | complex, multi-step, design system   | think
 x3    | error, bug, debug, gagal, rusak, stack     | failed, broken, fix, crash, traceback| issue
@@ -99,22 +97,6 @@ x5    | eval, self-critique, variance, konsistensi, flaky | ukur, regression, te
 x6    | systematic debug, RCA, root cause, hypothesis, auto-debug | 4 fase, intermittent, isolasi, reproduce | diagnose
 x7    | problem shaping, brainstorming, sign-off, framing, vague goal | decision, uncertainty, decompose tujuan, opsi | shape
 ```
-
-### ⚡ INSTANT COMMANDS (no skill match needed — execute immediately)
-
-```
-COMMAND       | TRIGGER KEYWORDS                    | ACTION
---------------|-------------------------------------|------------------------------------------
-rotate        | rotate, /rotate, ganti key          | ~/bin/rotate now → report result
-```
-
-When user says "rotate" or "/rotate" in ANY chat (including groups):
-1. Execute `~/bin/rotate now`
-2. Parse output
-3. Reply: `🔄 Rotating... ✅ Active: [key_id] ([provider]) | Model: [model]`
-
-NO confirmation. NO skill load. Direct execution.
-Applies to: all Telegram groups, DM, and any connected platform.
 
 ### Multi-skill orchestration
 
@@ -150,8 +132,6 @@ Mapping H → reference:
 - H8 → `browser.md` (Playwright dApp automation, governed signing)
 - H9 → `contract_read.md` (read) + `contract_write.md` (write, gated via governor)
 - H10 → `deploy.md` (compile/test/deploy/verify, CREATE2; deploy gated)
-- H11 → `residential-proxy/SKILL.md` (residential proxy: provider setup, verify, anti-ban for Google/Cloudflare/Stripe)
-- H12 → `rotating-proxy-pool/SKILL.md` (proxy pool: auto-rotate, geo-routing, sticky sessions, failover, health check)
 
 Reference scripts in `skills/hermes/scripts/` are copy-paste templates — adapt to operator env, never run as-is without env var check.
 

@@ -25,6 +25,7 @@ pip install playwright playwright-stealth
 See `references/sctg-solver.md` for full SCTG API docs, pricing, and integration.
 See `references/vinci-world-otp.md` for Vinci World OTP login flow details and DOM structure.
 See `references/gmail-oauth-vs-app-password-vps.md` for a detailed failure log of every OAuth approach from VPS and why App Password is the only viable path for personal Gmail.
+See `references/free-captcha-solvers.md` for a curated list of free/open-source captcha solvers (noCaptchaAi 6000/mo, puppeteer-recatcha via wit.ai, FastSolverCaptcha OCR, CaptchaFree Whisper, CapSolver trial).
 See `references/airdrop-api-discovery.md` for the pattern of discovering REST API endpoints from airdrop/Web3 sites via `performance.getEntriesByType()` and inline `<script>` analysis — faster than browser form submission.
 
 ## API Keys Required
