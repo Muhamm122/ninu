@@ -435,6 +435,58 @@ Full CDP stealth browser class: `~/.hermes/skills/superagent/tools/cdp_stealth.p
 - **Playwright + residential proxy** = works (needs real residential IP)
 - **`Emulation.setLocaleOverride`** fails if Playwright context already set locale (error: "Another locale override is already in effect") — set locale via Playwright API only, not CDP
 
+### OhMyCaptcha — Self-Hosted Solver (v3.0)
+
+**Repo**: `https://github.com/shenhao-stu/ohmycaptcha`
+**Location**: `/tmp/ohmycaptcha` (clone once, persists across sessions)
+**Service**: `http://localhost:8765` (must be started each session or via systemd)
+**Client Key**: `cupang_ohmycaptcha_2026`
+**Cloud Model**: MiMo V2.5 Pro (`https://token-plan-sgp.xiaomimimo.com/v1`)
+
+### Start Service
+```bash
+cd /tmp/ohmycaptcha && source .venv/bin/activate && \
+  export CLOUD_BASE_URL="https://token-plan-sgp.xiaomimimo.com/v1" && \
+  export CLOUD_API_KEY="tp-s...67" && \
+  export CLOUD_MODEL="mimo-v2.5-pro" && \
+  export CLIENT_KEY="cupang_ohmycaptcha_2026" && \
+  export HOST="0.0.0.0" && export PORT="8765" && \
+  nohup python main.py > /tmp/ohmycaptcha.log 2>&1 &
+```
+
+### Health Check
+```bash
+curl http://localhost:8765/api/v1/health
+```
+
+### Create Task
+```bash
+curl -s -X POST http://localhost:8765/api/v1/createTask \
+  -H "Content-Type: application/json" \
+  -d '{"clientKey":"cupang_ohmycaptcha_2026","task":{"type":"RecaptchaV2TaskProxyless","websiteURL":"https://target.com","siteKey":"6L..."}}'
+```
+
+### Get Result
+```bash
+curl -s -X POST http://localhost:8765/api/v1/getTaskResult \
+  -H "Content-Type: application/json" \
+  -d '{"clientKey":"cupang_ohmycaptcha_2026","taskId":"TASK_ID"}'
+```
+
+### ⚠️ Critical Limitations (Verified 2026-06-10)
+- ✅ Solves captcha WIDGETS (reCAPTCHA/hCaptcha/Turnstile/Image) after page loads
+- ❌ Does NOT bypass Cloudflare challenge page ("Just a moment...") — that's IP-level block
+- ❌ Does NOT work for Fliply, ZarPay, or any site with CF challenge page from datacenter IP
+- ✅ Works for sites where captcha appears as widget on the page itself
+- Browser: Playwright headless Chromium at `~/.cache/ms-playwright/chromium_headless_shell-1148`
+
+### When to Use OhMyCaptcha vs YesCaptcha/SCTG
+| Scenario | Best Tool |
+|----------|-----------|
+| reCAPTCHA/hCaptcha/Turnstile widget on page | OhMyCaptcha (free, self-hosted) |
+| Cloudflare challenge page blocking access | Residential proxy (no solver helps) |
+| No local resources (RAM/CPU) | YesCaptcha/SCTG (cloud) |
+| Image/text CAPTCHA | OhMyCaptcha ImageToTextTask |
 ## Tips
 1. Cek tipe captcha dulu sebelum solve
 2. Token ~2 menit, submit langsung
