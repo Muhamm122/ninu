@@ -3,6 +3,79 @@ name: superagent-infra
 description: "VPS, infrastructure, deployment, SSH, nginx, docker, systemd."
 ---
 
+## VPS Quick-Start Checklist (Fresh Ubuntu 24.04)
+
+When user asks "bantu setting VPS baru", run these in order:
+
+### 1. Initial Access & Hardening
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Create non-root user (if root only)
+adduser ubuntu && usermod -aG sudo ubuntu
+
+# SSH hardening
+sudo sed -i 's/#PermitRootLogin yes/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo systemctl restart sshd
+
+# Firewall
+sudo ufw default deny incoming && sudo ufw default allow outgoing
+sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp
+sudo ufw --force enable
+
+# fail2ban
+sudo apt install -y fail2ban && sudo systemctl enable --now fail2ban
+
+# Timezone
+sudo timedatectl set-timezone Asia/Jakarta
+```
+
+### 2. Core Runtime
+```bash
+# Python 3.11 + venv
+sudo apt install -y python3.11 python3.11-venv python3-pip build-essential
+python3 -m venv /opt/venv && echo 'source /opt/venv/bin/activate' >> ~/.bashrc
+
+# Node.js 20 + PM2
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
+sudo apt install -y nodejs && sudo npm install -g pm2
+
+# Docker
+curl -fsSL https://get.docker.com | sudo bash
+sudo systemctl enable --now docker && sudo usermod -aG docker ubuntu
+
+# Nginx + Certbot
+sudo apt install -y nginx certbot python3-certbot-nginx
+sudo systemctl enable --now nginx
+```
+
+### 3. Hermes Agent
+```bash
+# Install Hermes (adjust to current install method)
+pip install hermes-agent  # or from source
+
+# Hermes gateway
+hermes gateway start
+hermes gateway status
+```
+
+### 4. Verify
+```bash
+# All services running
+sudo systemctl status nginx docker fail2ban
+pm2 list
+ufw status
+python3 --version && node --version && docker --version
+```
+
+### Post-Setup Questions to Ask User
+1. Provider? (AWS/DO/Vultr/Hetzner) — affects metadata
+2. Purpose? (mining/trading/web/all-in-one) — affects service selection
+3. Domain? — for Nginx + SSL config
+4. Backup target? (GitHub SSH/S3/rclone)
+
 ## Operator Profile
 
 Senior systems provisioner. Commands that execute correctly on first run. Zero theory padding. Production-aware defaults.
@@ -477,6 +550,8 @@ See `references/hermes-miniapp-deploy.md` for deploying React+Vite+Express Teleg
 See `references/9router-db-reference.md` for 9Router SQLite DB schema, queries, and key management rules.
 See `references/vps-backup-restore.md` for full script templates.
 See `references/freellmapi-key-management.md` for adding API keys, version checks, and fallback chain details.
+See `references/juno-cash-mining.md` for Juno Cash (JUNO) Zcash-fork mining — junocashd config pitfalls, solo mining, wallet generation, and profitability notes.
+See `references/juno-cash-mining.md` for Juno Cash (JUNO) Zcash-fork mining setup — junocashd config pitfalls, solo mining, wallet generation, and profitability notes.
 See `scripts/health-monitor.py` for a ready-to-use multi-service health checker (systemd + PM2 + Docker + resource alerts).
 
 ## FastAPI + SQLite Task Tracker Micro-Pattern
@@ -531,6 +606,57 @@ sudo systemctl reload nginx
 ```
 
 **Security**: The `/download/` endpoint is an unauthenticated backdoor. ALWAYS remove it after the user confirms download. Tell the user: "⚠️ Link ini temporary — gua bakal hapus setelah lo konfirm udah download."
+
+---
+
+## SSH Access Patterns
+
+### Password Auth — Often Disabled by Default
+
+Modern VPS providers (AWS, Vultr, DigitalOcean, Linode) often disable password auth via SSH by default. If SSH with password fails:
+
+**Symptoms**: `Permission denied (publickey,password)` even with correct password.
+
+**Solutions** (pick one):
+1. **Key-based auth** (preferred): Generate SSH key pair, add public key to VPS via provider dashboard
+2. **sshpass**: Install on agent VPS first: `apt install -y sshpass`, then: `sshpass -p 'PASSWORD' ssh -o StrictHostKeyChecking=no user@IP "command"`
+3. **expect script**: Install `expect`, automate password entry
+4. **Provider console**: Use VPS provider's web console (VNC/serial) to enable password auth
+
+**Agent limitation**: If agent VPS doesn't have `sshpass`/`expect` installed and can't install (no root), agent cannot SSH to target VPS with password. User must either:
+- Install `sshpass` on agent VPS first
+- Use key-based auth
+- Run setup script directly on target VPS via provider web console
+
+### SSH Key Setup (Recommended)
+
+```bash
+# On agent VPS (one-time)
+ssh-keygen -t ed25519 -C "hermes-agent" -f ~/.ssh/id_ed25519 -N ""
+
+# Copy public key to target VPS
+ssh-copy-id -i ~/.ssh/id_ed25519.pub user@TARGET_IP
+
+# Test
+ssh -i ~/.ssh/id_ed25519 user@TARGET_IP "echo OK"
+```
+
+### Non-Root User Setup
+
+```bash
+# On target VPS (as root)
+adduser agent
+usermod -aG sudo agent
+mkdir -p /home/agent/.ssh
+cp ~/.ssh/authorized_keys /home/agent/.ssh/
+chown -R agent:agent /home/agent/.ssh
+chmod 700 /home/agent/.ssh
+chmod 600 /home/agent/.ssh/authorized_keys
+
+# Disable root SSH (after confirming agent user works)
+sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+systemctl restart sshd
+```
 
 ---
 
@@ -915,6 +1041,34 @@ fi
 **Key advantage over token-based auth**: SSH keys don't expire (unless revoked), no PAT rotation needed, works with `git push` without embedding credentials.
 
 **Security**: Private key stays on VPS only (`~/.ssh/id_ed25519`, mode 600). Public key on GitHub can be revoked anytime.
+
+## Telegram Group Creation — Bot Limitation
+
+Telegram Bot API **cannot create groups**. There is no `createChat` endpoint. When the user asks to "create a group":
+
+1. Ask the user to create the group manually in Telegram
+2. Have them add the bot (`@cupang_task_bot`) to the group
+3. User sends the chat ID (via `@userinfobot` or by forwarding a group message)
+
+The agent can then send messages to that chat ID via `curl` to `sendMessage` API.
+
+**Extract bot token** from environment when needed:
+```bash
+grep -o 'TELEGRAM_BOT_TOKEN=*** /etc/environment 2>/dev/null
+# or
+grep /proc/1/environ 2>/dev/null | tr '\0' '\n' | grep TELEGRAM_BOT_TOKEN
+```
+
+## Bash Script Writing — Heredoc & Emoji Pitfall
+
+Writing bash scripts containing emoji via heredoc or `write_file` causes syntax errors. **Workaround:** Use Python to write the file:
+```python
+with open('/tmp/script.sh', 'w') as f:
+    f.write(script_content)
+```
+Then transfer via `scp`. Alternatively, avoid emoji entirely in bash string literals.
+
+**Also:** `write_file` auto-masks secrets (API tokens, passwords → `***`). Scripts requiring tokens must have them set directly by the user via SSH or read from environment variables on the target machine.
 
 ## Constraints
 
