@@ -8,9 +8,12 @@
 | 200 | — | Working | Use |
 | 403 | 1010 | IP-based block | Keys are VALID. Keep in pool. Try from different IP. |
 | 401 | — | Key invalid/dead | Remove from pool immediately |
+| 402 | NO_CREDITS | **Upstream vendor pool empty** (not a key issue) | Wait for CastAI refill OR switch to OpenRouter/Ollama. Keys are valid, balance intact — CastAI's resold-vendor credits are exhausted. |
 | 429 | — | Rate limit | Rotate to next key, retry later |
 
 **Key insight:** 403 ≠ dead key. CastAI blocks VPS/data-center IPs. Same key may work from residential IP. Do NOT remove 403 keys — they're still valid.
+
+**402 ≠ dead key either.** CastAI is a model aggregator — your balance is intact, but their upstream GPU vendors (the actual inference providers they resell) are out of credits. Confirmed via Tor bypass (CF block is intermittent and irrelevant). Don't waste time switching models or keys — all paths hit 402 until CastAI refills upstream. Real fixes: wait for CastAI refill, get a new OpenRouter key (337 models, OpenRouter's own vendor pool), or deploy Ollama locally. See `references/vps-setup-lessons.md` "CastAI Kimchi 402 NO_CREDITS" for full diagnosis.
 
 ### MiMo (`https://token-plan-sgp.xiaomimimo.com/v1`)
 | HTTP | Meaning | Action |

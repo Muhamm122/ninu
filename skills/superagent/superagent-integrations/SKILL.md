@@ -275,6 +275,8 @@ async function sendWA(to, message) {
 }
 ```
 
+For deployable WhatsApp workflows (auto-reply, onboarding, scheduled reports, webhook bridges), use the **Kapso workflow platform** — see `references/kapso-workflows.md` for the full deployment recipe (CLI setup, project layout, node types, the Cloudflare function deployment workaround, build script pattern, and error catalog).
+
 ---
 
 ## X/Twitter Cookies-Based Auth (Internal GraphQL API)

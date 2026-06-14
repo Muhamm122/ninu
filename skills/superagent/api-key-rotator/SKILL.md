@@ -63,12 +63,13 @@ Multi-provider API key rotation. Rotate keys when errors occur — no continuous
 
 ### Key Status
 
-| Status | Meaning | Auto-recover |
-|--------|---------|--------------|
-| `active` | Healthy, can be used | — |
-| `rate_limited` | Hit 429, cooldown 60s | ✅ After 60s |
-| `exhausted` | Quota depleted / 402 | ❌ Manual reset |
-| `invalid` | 401/403, key is dead | ❌ Manual reset |
+| Status | Meaning | Error Msg | Auto-recover |
+|--------|---------|-----------|--------------|
+| `active` | Healthy, can be used | — | — |
+| `rate_limited` | Hit 429, cooldown 60s | 429 Too Many Requests | ✅ After 60s |
+| `exhausted` | Quota depleted, 402/403 | "exhausted its credits" / 402 | ❌ Manual reset |
+| `invalid` | Key dead/expired | 401 Invalid API Key / "User not found" | ❌ Manual reset |
+| `ip_blocked` | VPS IP blocked | 403 error 1010 / "invalid" | ✅ May recover (intermittent) |
 
 ## Rotation Strategies
 
@@ -269,9 +270,44 @@ model: qwen/qwen3-coder-480b-a35b-instruct
 key_format: nvapi-...
 ```
 
+## Kimchi Model Catalog (10 models, last verified 2026-06-13)
+
+`GET https://llm.kimchi.dev/openai/v1/models` returns:
+
+| Model | Notes | Status (2026-06-13) |
+|-------|-------|---------------------|
+| `kimi-k2.6` | Default, primary model | ❌ 402 exhausted |
+| `kimi-k2.5` | Older Kimi, may be more available | ❌ 402 exhausted |
+| `minimax-m3` | Newest MiniMax | ❌ 402 exhausted |
+| `minimax-m2.7` | MiniMax M 2.7 | ❌ 402 exhausted |
+| `minimax-m2.5` | MiniMax M 2.5 | ❌ 402 exhausted |
+| `nemotron-3-super-fp4` | NVIDIA quantized | ❌ 402 exhausted |
+| `nemotron-3-ultra-fp4` | NVIDIA quantized ultra | ❌ 402 exhausted |
+| `qwen3-coder-next-fp8` | Qwen coder | ❌ 400 no provider |
+| `smollm2-135m` | Tiny — test only | ❌ 400 no provider |
+| `smollm2-360m` | Tiny — test only | ❌ 400 no provider |
+
+**As of 2026-06-13, ALL 10 models are unavailable**:
+- 7 models: 402 "provider exhausted its credits" (global CastAI vendor pool empty)
+- 3 models: 400 "no registered providers" (no vendor on-boarded at all — different from credit exhaustion)
+- Switching model does NOT help — issue is at CastAI upstream vendor level, not per-model quota
+- See "CastAI provider credits exhausted" section above for real fixes
+
+**All models** may simultaneously return `402 "provider exhausted its credits"` when
+upstream CastAI credits are depleted — this is global, not per-model. Test pattern
+probes all 10 via a single script (see `scripts/provider-health-check.py`).
+
+## Alternative Kimchi URL
+
+`https://api.tokenrouter.com/v1` is **a different service** in the same CastAI
+ecosystem. It accepts `castai_v1_...` keys BUT treats them as a separate
+namespace — Kimchi keys return `401 "Invalid token"`. Do not switch base URL
+to tokenrouter without re-issuing keys there. (Found 2026-06-13 in
+`config.yaml` as a stale entry from a previous config.)
+
 ## VPS IP Block Pattern (CastAI/Kimchi)
 
-CastAI (llm.kimchi.dev) implements IP-based blocking:
+CastAI (llm.kimchi.dev) implements IP-based blocking via Cloudflare:
 - **403 error 1010** = IP block, NOT key invalid. Keys are valid but VPS IP is blocked.
 - **401** = Key genuinely invalid/expired — remove from pool immediately.
 - **429** = Rate limit — back off, rotate to next key.
@@ -279,6 +315,43 @@ CastAI (llm.kimchi.dev) implements IP-based blocking:
 - Tor exit nodes also get 402/403 from CastAI.
 - **Action**: For 403, keep keys in pool (they work from other IPs). For 401, remove immediately.
 - User confirmed: keys work from local machine but not VPS = IP block, not key issue.
+
+### User-Agent matters for CastAI block (CRITICAL pitfall, 2026-06-13)
+
+When testing Kimchi keys from Python, the **User-Agent header determines whether Cloudflare blocks the request**:
+- `User-Agent: python-urllib/3.11` (Python default) → **403 blocked**
+- `User-Agent: curl/7.88.1` → **200 OK**
+
+This is a Cloudflare bot-detection signature, not an IP block. The block is **intermittent** because CF rotates which UA signatures get through.
+
+**Workaround** in Python test scripts:
+```python
+req = urllib.request.Request(url, headers={
+    "Authorization": f"Bearer {key}",
+    "User-Agent": "curl/7.88.1"  # bypasses CF bot detection
+})
+```
+
+**Misconception warning**: If your test uses Tor + a custom UA, the working request may be from the UA change, NOT from Tor. Test by switching UA without Tor first to isolate. Tor alone does NOT reliably bypass CastAI's CF (it gets 402 rate-limited from exit nodes anyway).
+
+**In any Kimchi client/integration**: set `User-Agent: curl/7.88.1` (or any non-default UA) explicitly to avoid the block.
+
+### CastAI provider credits exhausted (June 2026, system-wide)
+
+As of 2026-06-13, CastAI's upstream vendor pool is **globally empty**:
+- 7 models return **402 "the provider for model X has exhausted its credits and cannot be used"**: `kimi-k2.6`, `kimi-k2.5`, `minimax-m2.7`, `minimax-m3`, `minimax-m2.5`, `nemotron-3-super-fp4`, `nemotron-3-ultra-fp4`
+- 3 models return **400 "no registered providers found for the requested model"**: `qwen3-coder-next-fp8`, `smollm2-135m`, `smollm2-360m` (no vendor onboarded at all — different problem from credit exhaustion)
+- User's CastAI account balance stays intact; you can't transfer funds to upstream vendors
+- **Ganti model tidak ngaruh** — semua 402 sampai CastAI refill vendor pool
+- Same error from all 4 Kimchi keys + tested via Tor (3 retries × 10 models = 30/30 consistent)
+- Test pattern: see `scripts/provider-health-check.py` which probes all keys × all models and classifies errors
+
+**Real fixes (in order of speed):**
+1. **OpenRouter key baru** — 5 min, 337 models, vendor pool terpisah dari CastAI
+2. **Ollama lokal** — 30 min, self-hosted, no aggregator middleman
+3. **9router restart** — 5 min, local proxy aggregator (currently down, needs `systemctl restart 9router`)
+4. **Wait for CastAI refill** — no ETA, not user-controlled; 3 models (qwen3, smollm2) need vendor on-boarding first, not just refill
+5. **CastAI support ticket** — 24h+, request vendor on-boarding for missing models
 
 ## Provider Naming Convention
 
@@ -296,6 +369,7 @@ Modern VPS providers often disable password auth via SSH:
 - sshpass may not be available: `apt install sshpass` (requires root)
 - Best practice: set up key-based auth immediately after first login
 - Ubuntu 24.04: password auth may work but gets dropped in subsequent connections
+- **NEVER use `sshpass + ssh + heredoc` for multi-line file writes** — nested quoting always breaks (f-strings, `$()`, special chars). Write locally, SCP over. See superagent-infra SKILL.md for details.
 
 ## Hermes Install on Ubuntu 24.04
 
@@ -557,5 +631,8 @@ When provider IP is blocked (403/429), deploy a Cloudflare Worker as proxy:
 
 - `references/providers.md` — Provider-specific documentation (MiMo, OpenRouter, Kimchi, NVIDIA)
 - `references/cloudflare-worker-deploy.md` — Cloudflare Worker deployment guide, token permission pitfalls, MEXC-specific worker code
+- `references/provider-errors.md` — Error code reference per provider (401/402/403/429 classification)
+- `references/castai-kimchi-status-2026-06.md` — **June 2026 status snapshot** — all 10 models 402/400, User-Agent bypass discovery (CRITICAL pitfall), alternative URL survey, real fix options
 - `scripts/switch-model.sh` — Per-key model switcher script (also installed at `~/bin/switch-model`)
+- `scripts/provider-health-check.py` — Probe all providers/keys/models in one shot, classify errors (exhausted vs invalid vs IP-blocked)
 7. **Provider mismatch** — when rotating, the script updates ALL of provider/model/base_url/api_key in config.yaml. Ensure each pool entry has correct provider-specific values.

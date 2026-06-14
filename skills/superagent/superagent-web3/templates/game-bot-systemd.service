@@ -1,0 +1,28 @@
+[Unit]
+Description=<GAME_NAME> Auto-Farm Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/.hermes/skills/<GAME_NAME>/scripts
+ExecStart=/usr/bin/env node bot.js
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/ubuntu/.hermes/skills/<GAME_NAME>/logs/bot.log
+StandardError=append:/home/ubuntu/.hermes/skills/<GAME_NAME>/logs/bot.log
+
+# CRITICAL: PrivateTmp=false so token files written to /tmp/ survive restarts.
+# The bot's TOKEN_PATH is moved to ./data/ anyway, but if a library writes to
+# /tmp, it will be wiped on every Restart=always cycle with PrivateTmp=true.
+PrivateTmp=false
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.hermes/skills/<GAME_NAME> /home/ubuntu/.hermes/skills/<GAME_NAME>/data /home/ubuntu/.hermes/skills/<GAME_NAME>/logs
+
+[Install]
+WantedBy=multi-user.target

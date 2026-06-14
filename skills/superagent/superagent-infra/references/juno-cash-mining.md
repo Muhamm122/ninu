@@ -1,268 +1,137 @@
-# Juno Cash (JUNO) Mining Reference
+# Juno Cash Mining — Setup & Pitfalls
 
-## What is Juno Cash?
+## Algorithm
 
-Juno Cash is a **Zcash fork** (Zerocash protocol) with:
-- **RandomX PoW** (NOT Equihash — despite being a Zcash fork, Juno Cash uses RandomX)
-- **Shielded-by-default** transactions (Orchard pool)
-- **Transparent addresses only for mining** (coinbase rewards)
-- Mined coins must be shielded via `z_shieldcoinbase` before spending
-- No trusted setup
-- NU6.2 hard fork (Orchard re-enabled at block 296000 mainnet)
-- Protocol version 170150
+Juno Cash uses **custom RandomX variant** (NOT standard `rx/0`). Standard XMRig produces invalid hashes.
 
-⚠️ **CORRECTION:** Earlier reference said Equihash — Juno Cash actually uses **RandomX** (like Monero). Confirmed from debug log: `RandomX: Auto-enabling fast mode for mining`.
+## ⚠️ XMRig is INCOMPATIBLE with Juno Cash
 
-## Binary Installation (v0.9.12, June 2026)
+**All XMRig versions (6.22.3–6.26.0) produce 100% rejected shares ("Invalid hash").**
+
+Root cause: Juno Cash uses a custom RandomX variant. XMRig computes standard `rx/0` hashes that pools reject.
+
+| Miner | Result | Why |
+|-------|--------|-----|
+| **XMRig** | ❌ All shares rejected | Custom RandomX variant mismatch |
+| **SRBMiner** | ❌ SIGSEGV crash | Anti-VM detection on QEMU |
+| **junocashd solo** | ✅ Works | Official daemon, correct algo |
+
+**Only junocashd (official daemon) can mine Juno Cash correctly.**
+
+## Node Config Quirks
+
+| Quirk | Detail |
+|-------|--------|
+| **Config filename** | Must be `junocashd.conf` (NOT `junocash.conf`) |
+| **Mainnet mining** | Use `-gen` flag (NOT `generate` RPC — regtest-only) |
+| **Thread control** | `-genproclimit=N` in CLI flag |
+| **Mining address** | `t_getminingaddress` RPC |
+| **getnewaddress** | Deprecated — use `t_getminingaddress` |
+| **localhashps: 0** | Normal during sync/reindex |
+| **getbalance error -28** | Normal during reindex |
+| **RPC client** | `junocash-cli` utility (NOT `junocashd`) |
+
+## Config File Conflict — CRITICAL PITFALL
+
+**Symptom:** junocashd exit code 1, systemd restart loop.
+
+**Cause:** Two configs — `junocashd.conf` (correct, port 8232) and `junocash.conf` (wrong, port 26788).
+
+**Fix:** Ensure systemd uses `junocashd.conf`.
+
+## Lock File Pitfall
+
+**Symptom:** "Cannot obtain a lock on data directory."
+
+**Fix:** `killall junocashd; rm -f /root/.junocash/.lock`
+
+## SSH File Writing — Critical Pitfall
+
+**NEVER use sshpass + heredoc for multi-line files.** Use write locally → SCP → execute pattern instead.
+
+## Install Path (Ubuntu + AlmaLinux/RHEL)
+
+junocashd v0.9.12 ships as a self-contained linux64 tarball (no compile needed). Install in 4 steps on either OS family:
 
 ```bash
+# Detect OS first
+cat /etc/os-release | grep ^ID=   # ubuntu | almalinux | debian | rhel | rocky | fedora
+
+# Ubuntu/Debian
+apt-get install -y wget tar libssl-dev libcurl4-openssl-dev
+
+# AlmaLinux/RHEL/Rocky/Fedora
+dnf install -y openssl-devel libcurl-devel boost-devel wget tar
+
+# Download + verify + install (same on all distros)
 cd /tmp
-wget "https://github.com/juno-cash/junocash/releases/download/v0.9.12/junocash-0.9.12-linux64.tar.gz"
-tar xzf junocash-0.9.12-linux64.tar.gz
-# Extracts to /tmp/junocash-0.9.12/ (NOT junocash-0.9.12-linux64/)
-cp /tmp/junocash-0.9.12/bin/* /usr/local/bin/
-chmod +x /usr/local/bin/junocash*
+wget -q https://github.com/juno-cash/junocash/releases/download/v0.9.12/junocash-0.9.12-linux64.tar.gz
+wget -q https://github.com/juno-cash/junocash/releases/download/v0.9.12/SHA256SUMS
+sha256sum -c --ignore-missing SHA256SUMS          # must report OK
+tar -xzf junocash-0.9.12-linux64.tar.gz           # extracts to junocash-0.9.12/ (not junocash-0.9.12-linux64/)
+install -m 755 junocash-0.9.12/bin/junocashd /usr/local/bin/junocashd
+install -m 755 junocash-0.9.12/bin/junocash-cli /usr/local/bin/junocash-cli
 ```
 
-⚠️ **Pitfall:** Tar extracts to `junocash-0.9.12/` not `junocash-0.9.12-linux64/`.
+Re-runnable install script: `scripts/install_junocashd_remote.py` — handles OS detect, deps, config, systemd, and paramiko-safe daemon start in one shot.
 
-Binaries: `junocashd`, `junocash-cli`, `junocashd-wallet-tool`, `junocash-tx`
+**Templates** (drop-in, no edits): `templates/junocashd.service` (systemd unit) and `templates/junocashd.conf` (mainnet config with seed nodes baked in).
 
-## ⚠️ Critical Pitfall: Config File Name
+## ⚠️ Slow Sync / Stuck at <2 Peers
 
-junocashd looks for **`junocashd.conf`** (NOT `junocash.conf`) in the datadir. Using the wrong name causes RPC auth failures.
+**Symptom:** Node starts, connects to 0-1 peer, downloads ~150 blocks in 10 min, then stalls. Headers crawl. `getconnectioncount` stays at 1.
 
-```bash
-# Correct config location:
-/root/.junocash/junocashd.conf
+**Cause:** Juno Cash network is small and peer discovery via DNS seeds is unreliable.
 
-# Config content:
-server=1
-rpcuser=junorpc
-rpcpassword=<random-hex>
-rpcport=8232
-rpcallowip=127.0.0.1
-listen=1
-daemon=0
-txindex=1
-addressindex=1
-timestampindex=1
-spentindex=1
+**Fix — hardcode seed nodes in `junocashd.conf`:**
 ```
-
-## Wallet & Mining Address
-
-```bash
-# Start daemon first
-junocashd -datadir=/root/.junocash -daemon &
-sleep 10
-
-# Get mining address (transparent, for coinbase rewards)
-junocash-cli -datadir=/root/.junocash t_getminingaddress
-
-# Get shielded address (for receiving funds)
-junocash-cli -datadir=/root/.junocash z_getnewaccount
-junocash-cli -datadir=/root/.junocash z_getaddressforaccount 0
-
-# Dump private key
-junocash-cli -datadir=/root/.junocash dumpprivkey <t-address>
+addnode=dnsseed.junocash.com
+addnode=seed.junocash.com
+addnode=mainnet.junocash.tools
 ```
+Restart daemon: `junocash-cli stop && rm -f .lock && junocashd -daemon`. Peers should jump to 3-8 within a minute.
 
-⚠️ **Pitfall:** `getnewaddress` is DEPRECATED and DISABLED. Returns error about using `t_getminingaddress` for mining and `z_getnewaddress` for shielded.
+## ⚠️ `junocashd -daemon` Hangs Paramiko — CRITICAL
 
-⚠️ **Pitfall:** `generate` RPC method only works on regtest chain. On mainnet, use `-gen` daemon flag instead.
+**Symptom:** Calling `junocashd -daemon` via `paramiko.SSHClient.exec_command()` blocks for the full timeout (30-60s) and raises `PipeTimeout`/`socket.timeout`, even though the daemon started fine.
 
-## Mining Setup
+**Cause:** `-daemon` mode forks and the daemonized child inherits + keeps open the stdout/stderr file descriptors from the SSH channel. Paramiko's exec_command waits for those FDs to close. They never do.
 
-### Start Mining (Correct Way)
-
-```bash
-# Stop existing
-pkill -9 junocashd 2>/dev/null
-sleep 2
-rm -f /root/.junocash/.lock /root/.junocash/junocashd.pid 2>/dev/null
-
-# Start with -gen flag (NOT setgenerate)
-junocashd -datadir=/root/.junocash \
-  -gen \
-  -genproclimit=12 \
-  -equihashsolver=default \
-  -mineraddress=t1YOURADDRESS \
-  -daemon &
-```
-
-### Systemd Service
-
-```ini
-[Unit]
-Description=Juno Cash Daemon
-After=network.target
-
-[Service]
-Type=simple
-User=root
-ExecStart=/usr/local/bin/junocashd -datadir=/root/.junocash \
-  -gen \
-  -genproclimit=12 \
-  -equihashsolver=default \
-  -mineraddress=t1YOURADDRESS
-Restart=always
-RestartSec=10
-LimitNOFILE=65536
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### Verify Mining
-
-```bash
-# Check mining status
-junocash-cli -datadir=/root/.junocash getmininginfo
-# Look for: "generate": true, "genproclimit": 12
-
-# Check debug log for mining threads
-grep "JunoMonetaMiner started" /root/.junocash/debug.log | wc -l
-grep "RandomX: Auto-enabling fast mode" /root/.junocash/debug.log
-
-# Check CPU usage (should show mining threads)
-sar -u 1 3
-```
-
-⚠️ **Pitfall:** `localhashps` may show 0 H/s during initial sync. This is normal — mining threads start but hashrate isn't reported until node is fully synced. Debug log will show mining threads running regardless.
-
-## Telegram Monitoring & Alerts
-
-### Bot Cannot Create Groups Programmatically
-
-⚠️ **Pitfall:** Telegram Bot API has no `createChat` endpoint. Bots **cannot create groups**. User must:
-1. Create group manually in Telegram
-2. Add the bot (`@cupang_task_bot`) to the group
-3. Send the chat ID to the agent
-
-Extract bot token from environment:
-```bash
-grep -r "TELEGRAM_BOT_TOKEN" /etc/environment ~/.hermes/.env 2>/dev/null
-# Or from service file:
-grep -o 'TELEGRAM_BOT_TOKEN=*** /path/to/service
-```
-
-### Telegram Alert Script Pattern
-
-Create `/usr/local/bin/juno-monitor` on the mining VPS that sends HTML messages to a Telegram chat:
-
-```bash
-#!/bin/bash
-# Usage: juno-monitor <check|block> <chat_id>
-BOT_TOKEN="YOUR...tg() {
-    curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-        -H "Content-Type: application/json" \
-        -d "{\"chat_id\": ${CHAT_ID}, \"text\": \"$1\", \"parse_mode\": \"HTML\"}" \
-        > /dev/null 2>&1
-}
-
-# ... (check/block cases)
-```
-
-**Pitfall — Emoji in Bash Heredoc:** Writing bash scripts with emoji (⛏️🟢🔴🎉) via heredoc or `write_file` causes syntax errors. **Workaround:** Use Python to write the file locally, then `scp` to VPS:
+**Fix — launch via nohup with full FD redirection, return immediately, verify separately:**
 ```python
-with open('/tmp/juno-monitor.sh', 'w') as f:
-    f.write(script_content)
+ssh.exec_command(
+    "pkill -f junocashd 2>/dev/null; sleep 2; rm -f /root/.junocash/.lock; "
+    "nohup /usr/local/bin/junocashd -datadir=/root/.junocash "
+    "-conf=/root/.junocash/junocashd.conf -daemon "
+    "> /var/log/junocashd-startup.log 2>&1 < /dev/null & disown",
+    timeout=5  # returns immediately
+)
+time.sleep(10)  # let daemon bind ports
+# Then verify with separate calls
+ssh.exec_command("ps aux | grep junocashd | grep -v grep")
+ssh.exec_command("ss -tlnp | grep 8234")
 ```
 
-**Pitfall — `write_file` Token Masking:** Hermes auto-masks API tokens (`BOT_TOKEN=*** You CANNOT write a script containing a bot token via `write_file`. **Workaround:** User sets token directly via SSH, or script reads from env var on the VPS itself.
+**Alternative** (if -daemon must be called directly): use `get_pty=False` and accept the timeout, then check `ps` separately — but the daemon DOES start, you just can't read the response.
 
-### Cron Jobs for Monitoring
+Encoded in `scripts/install_junocashd_remote.py`.
 
+## Sync Progress Check
+
+**Quick script** (recommended for Telegram/chat replies): `scripts/check_juno_sync.py <host> <user> <key>` — one-line concise status.
+
+**Manual:**
 ```bash
-# /etc/cron.d/juno-mining
-# Status report every 6 hours
-0 */6 * * * root /usr/local/bin/juno-monitor check CHAT_ID >> /root/.junocash/cron.log 2>&1
-# Block check every 5 minutes
-*/5 * * * * root /usr/local/bin/juno-block-check CHAT_ID >> /root/.junocash/cron.log 2>&1
+junocash-cli -datadir=/root/.junocash -conf=/root/.junocash/junocashd.conf getblockchaininfo | python3 -c "import json,sys; d=json.load(sys.stdin); print('Blocks:', d['blocks']); print('Progress: {:.2f}%'.format(d['verificationprogress']*100))"
 ```
 
-### Wallet.dat Backup
+(Write as local script, SCP upload, then execute to avoid SSH quoting issues.)
 
-Always backup `wallet.dat` immediately after wallet generation:
-```bash
-# From agent VPS:
-sshpass -p 'PASSWORD' scp root@MINING_IP:/root/.junocash/wallet.dat \
-    ~/.hermes/data/junocash_wallet_backup.dat
-```
+## Quick-Reference Templates & Scripts
 
-⚠️ **Pitfall — Seed Phrase:** junocashd auto-generates mnemonic seed on first launch but **never displays it**. Only `wallet.dat` contains the keys. To get seed phrase, use `junocashd-wallet-tool`. Private keys per address can be obtained via `dumpprivkey`.
-
-## Node Sync
-
-```bash
-# Check sync progress
-junocash-cli -datadir=/root/.junocash getblockchaininfo
-# Look for: verificationprogress (0.0 to 1.0)
-
-# Check connections
-junocash-cli -datadir=/root/.junocash getconnectioncount
-```
-
-Juno Cash network has ~400K+ blocks. Fresh sync takes several hours.
-
-## Security: Backup Private Keys
-
-Always dump and backup private keys for ALL transparent addresses:
-
-```bash
-for addr in $(junocash-cli -datadir=/root/.junocash listaddresses | grep "t1" | tr -d " \","); do
-  echo "Address: $addr"
-  junocash-cli -datadir=/root/.junocash dumpprivkey "$addr"
-done
-```
-
-Also backup `wallet.dat`:
-```bash
-scp root@VPS_IP:/root/.junocash/wallet.dat ~/.hermes/data/junocash_wallet_backup.dat
-```
-
-## ⚠️ Pitfall: Lock File
-
-If junocashd was killed ungracefully, `.lock` file remains and prevents restart:
-```bash
-rm -f /root/.junocash/.lock /root/.junocash/junocashd.pid
-```
-
-## Status Script
-
-Create `/usr/local/bin/juno-status`:
-```bash
-#!/bin/bash
-echo "========== JUNO CASH MINING STATUS =========="
-echo "Time: $(date)"
-echo "---"
-junocash-cli -datadir=/root/.junocash getmininginfo 2>&1 | grep -E "blocks|difficulty|localhashps|localsolps|networkhashps|generate"
-echo "---"
-junocash-cli -datadir=/root/.junocash getblockchaininfo 2>&1 | grep -E "blocks|headers|verificationprogress"
-echo "---"
-echo "CPU: $(ps aux | grep junocashd | grep -v grep | awk '{sum+=$3} END {printf "%.1f%%", sum}')"
-echo "Mining Threads: $(grep -c 'JunoMonetaMiner started' /root/.junocash/debug.log 2>/dev/null)"
-echo "Connections: $(junocash-cli -datadir=/root/.junocash getconnectioncount 2>/dev/null)"
-echo "=============================================="
-```
-
-## Profitability Notes
-
-- **CPU mining only** — RandomX is CPU-friendly but VPS CPU hashrate is low
-- Network hashrate is small (~400-900 H/s) — solo mining viable with enough CPU
-- 12-core VPS might get ~200-500 H/s on RandomX with fast mode (2GB dataset)
-- No major pools support Juno Cash — solo mining only
-- For consistent payout, consider Monero (XMR) via XMRig pool instead
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `generate: false` in getmininginfo | Using `setgenerate` RPC (regtest only) | Use `-gen` daemon flag |
-| `localhashps: 0` | Normal during sync | Wait for full sync; check debug log for mining threads |
-| RPC error -28 "Loading wallet" | Wallet still loading on first run | Wait and retry |
-| `error code: -28 "disabled while reindexing"` | Node is reindexing/syncing | Wait for sync to complete |
-| Lock file prevents restart | Ungraceful shutdown | Remove `.lock` and `.pid` files |
+| File | Purpose |
+|---|---|
+| `templates/junocashd.service` | Systemd unit (Type=forking, PIDFile, no CPUQuota) |
+| `templates/junocashd.conf` | Mainnet config (RPC, P2P, seed nodes, mining commented) |
+| `scripts/install_junocashd_remote.py` | Full paramiko install: detect OS → install → config → systemd → start |
+| `scripts/check_juno_sync.py` | One-shot sync/peer/mining/balance status report |

@@ -1,0 +1,39 @@
+# junocashd daemon (Juno Cash) systemd unit
+# Mining via -gen flag enabled by default — daemon starts mining threads.
+# For sync-only first, comment out the gen flags in junocashd.conf.
+
+[Unit]
+Description=Juno Cash Daemon
+Documentation=https://junocash.com
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=root
+Group=root
+WorkingDirectory=/root/.junocash
+
+# -daemon forks and detaches. PIDFile lets systemd track the daemonized child.
+ExecStart=/usr/local/bin/junocashd -datadir=/root/.junocash -conf=/root/.junocash/junocashd.conf -daemon
+ExecStop=/usr/local/bin/junocash-cli -datadir=/root/.junocash -conf=/root/.junocash/junocashd.conf stop
+# Reload: stop, clear lock file (prevents stale-lock restart loop), restart
+ExecReload=/bin/sh -c '/usr/local/bin/junocash-cli -datadir=/root/.junocash -conf=/root/.junocash/junocashd.conf stop; sleep 5; rm -f /root/.junocash/.lock; /usr/local/bin/junocashd -datadir=/root/.junocash -conf=/root/.junocash/junocashd.conf -daemon'
+
+PIDFile=/root/.junocash/junocashd.pid
+
+# Auto-restart on failure (not on clean stop)
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=60
+
+# CRITICAL: do NOT add CPUQuota= or memory throttling — mining needs 100% CPU
+# CPUQuota=90% caps mining to <1 core (documented pitfall)
+LimitNOFILE=65536
+
+# Hardening (still leaves P2P listen unrestricted)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
