@@ -674,7 +674,27 @@ Use x-actions (or direct GraphQL API) to complete Twitter airdrop tasks (follow,
 scripts = re.findall(r'src="(https://abs\.twimg\.com/responsive-web/client-web[^"]+\.js)"', requests.get('https://x.com').text)
 # Then search each JS bundle for: queryId:"XXXX" ... operationName:"OperationName"
 ```
-⚠️ **v1.1 API is dead (2026-06)**: `api.x.com/1.1/statuses/user_timeline.json` returns 404 (not 401). Do NOT use any v1.1 endpoints. Use GraphQL exclusively.
+⚠️ **v1.1 API partial (corrected 2026-06-14)**: Read endpoints (`/statuses/user_timeline.json`) and write mutations `/statuses/retweet.json`, `/statuses/unretweet.json`, `/statuses/update.json` return 404. But `/1.1/favorites/create.json` (like), `/1.1/friendships/create.json` (follow), and `/1.1/friendships/destroy.json` (unfollow) STILL return 200 in 2026-06-14. **Use v1.1 for likes and follows** (no QID needed, no features dict), **use GraphQL v2 for retweet/post/quote**. The blanket "v1.1 is dead, use GraphQL exclusively" is wrong — partial only. See `references/cookie-api-patterns.md` in the xurl skill for the full verified v1.1 status table.
+
+⚠️ **QID HTML discovery works via status page**: `requests.get('https://x.com')` returns 401, but `requests.get('https://x.com/{handle}/status/{tweet_id}')` returns 200 HTML with the current `main.{hash}.js` bundle URL embedded. Pattern:
+```python
+# Step 1: fetch the X status page (200 with full HTML, unlike x.com root)
+r = requests.get(f'https://x.com/{handle}/status/{tweet_id}',
+    headers={'User-Agent': UA, 'Cookie': cookie_str}, timeout=30)
+# Step 2: extract current main.{hash}.js URL
+bundles = re.findall(r'https://abs\.twimg\.com/responsive-web/client-web/main\.[a-f0-9]+\.js', r.text)
+bundle_url = bundles[0]  # current hash
+# Step 3: fetch the bundle (200, no auth needed)
+bundle = requests.get(bundle_url, headers={'User-Agent': UA}, timeout=15).text
+# Step 4: extract queryIds
+qids = {}
+for op in ['CreateTweet', 'CreateRetweet', 'DeleteRetweet', 'FavoriteTweet', 'UnfavoriteTweet', 'UserByScreenName']:
+    m = re.search(r'queryId:"([A-Za-z0-9_-]+)",operationName:"' + op + '"', bundle)
+    if m: qids[op] = m.group(1)
+```
+This is the most reliable way to get fresh QIDs from a datacenter VPS without Playwright/headless browser.
+
+⚠️ **X account with phone challenge still works for API**: X.com's web login may show a "Verify your phone" wall, but if the user provides a valid `ct0` + `auth_token` cookie pair (from Cookie Editor export or similar), the API at `x.com/i/api/graphql/...` accepts the cookies normally. The phone challenge is a UI gate on web login, not an API-level block. **Symptom**: `friendships/create.json` returns 200 but `following:false` on first call — the follow DID land but the response is stale. Re-call the endpoint, then verify with `/friendships/show.json` after a brief delay.
 ⚠️ **QID HTML discovery blocked**: `requests.get('https://x.com')` returns 401. JS bundle URLs only accessible via browser rendering. Use cached QIDs or Playwright+CDP to intercept.
 Generic QID `D1nwFlsu_qHsX92YzoRaaA` applies to many operations but is NOT the real per-operation QID and returns 405 on write mutations. Always use the specific QID paired with the operationName.
 

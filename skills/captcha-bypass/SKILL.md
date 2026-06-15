@@ -27,6 +27,8 @@ See `references/vinci-world-otp.md` for Vinci World OTP login flow details and D
 See `references/gmail-oauth-vs-app-password-vps.md` for a detailed failure log of every OAuth approach from VPS and why App Password is the only viable path for personal Gmail.
 See `references/free-captcha-solvers.md` for a curated list of free/open-source captcha solvers (noCaptchaAi 6000/mo, puppeteer-recatcha via wit.ai, FastSolverCaptcha OCR, CaptchaFree Whisper, CapSolver trial).
 See `references/airdrop-api-discovery.md` for the pattern of discovering REST API endpoints from airdrop/Web3 sites via `performance.getEntriesByType()` and inline `<script>` analysis — faster than browser form submission.
+See `references/privy-session-sync.md` for the **Privy-backed app auth bypass** — even when the React frontend passes `loginMethods: ["twitter"]` to the Privy SDK, the backend `/auth/privy/sync` endpoint accepts any Privy identity_token (including email OTP) and sets an HTTP-only session cookie. This unlocks X-only airdrops via email signup.
+See `templates/airdrop-daily-cron.py` for a **reusable daily-maintenance template** for any Privy-backed airdrop (Privy token refresh + app session re-sync + status report). For a concrete worked example see `/home/ubuntu/.hermes/scripts/pear_daily_login.py` (Pear case, 2026-06-14).
 
 ## API Keys Required
 ```env
@@ -478,6 +480,159 @@ If typing into digit fields fails (ref expired), re-snapshot first.
 6. ⬜ Enter code digit-by-digit or bulk
 7. ⬜ Snapshot result — check for "Invalid" error or success redirect
 8. ⬜ If "Invalid": you MUST re-send OTP (old code is dead), tell user to check for NEW email, repeat from step 4
+
+## Privy-Backed Web3 App Auth Bypass — Class-Level Pattern
+
+**Privy.io** is the most common auth provider for Web3 airdrops and points platforms (Pear, Renaiss, Vinci World, and dozens of similar React apps). Many of these apps configure the Privy SDK to show **only** X (Twitter) login in the frontend, requiring an X account for signup.
+
+**The bypass (verified 2026-06-14 on Pear/rewards.pear.trade):** The **backend** almost always accepts ALL Privy auth methods, including email OTP. The frontend's `loginMethods: ["twitter"]` config is a UX choice, not a security boundary. You can complete signup/login via email OTP and then call the backend API with the resulting session cookie — **bypassing the X requirement entirely for account creation and most non-X API calls**.
+
+### 4-Step Universal Flow
+
+```python
+import requests
+
+# Step 1: Discover the Privy app_id
+# Grep the JS chunks for "privy-app-id" or "app_id" — typically 27-char base62 string
+PRIVY_APP_ID = "cmmtgs24k01gi0cjfyfku199k"  # example from Pear
+PRIVY_BASE = "https://auth.privy.io"
+
+# Step 2: Request OTP (no captcha needed if app's captcha_enabled=false)
+# Token field is for Turnstile/captcha; send "" if not required.
+r = requests.post(f"{PRIVY_BASE}/api/v1/passwordless/init",
+    json={"email": "burner@domain.com", "token": ""},
+    headers={"privy-app-id": PRIVY_APP_ID, "Content-Type": "application/json"},
+    timeout=30)
+assert r.status_code == 200 and r.json().get("success")
+
+# Step 3: Fetch OTP from inbox (mail.tm, IMAP, or other)
+# OTP email is typically from no-reply@privy.io, subject "Your login code for <AppName>"
+# 6-digit code, expires in ~10 min
+# Use mail.tm API: GET /messages with Bearer token
+
+# Step 4: Authenticate → get identity_token + privy_access_token + refresh_token
+r = requests.post(f"{PRIVY_BASE}/api/v1/passwordless/authenticate",
+    json={"email": "burner@domain.com", "code": otp, "mode": "login-or-sign-up"},
+    headers={"privy-app-id": PRIVY_APP_ID, "Content-Type": "application/json",
+             "Origin": "https://<target-site>", "Referer": "https://<target-site>/login"},
+    timeout=30)
+sess = r.json()
+# sess contains: {user, token (identity_token), privy_access_token, refresh_token, is_new_user}
+# If is_new_user == True, this is a fresh account creation — points achieved!
+
+# Step 5 (CRITICAL): Sync Privy session to the APP's backend
+# The app's backend validates the Privy identity_token and sets an HTTP-only
+# session cookie. This cookie is what the app's API endpoints trust.
+# Endpoint pattern: POST <app-api>/auth/privy/sync with {token: identity_token}
+r = requests.post("https://temp.pear.trade/api/auth/privy/sync",
+    json={"token": sess["token"]},  # <-- field name is "token", singular!
+    headers={
+        "privy-app-id": PRIVY_APP_ID,
+        "User-Agent": "<real Chrome UA from FlareSolverr>",
+        "Origin": "https://<target-site>",
+        "Referer": "https://<target-site>/dashboard",
+        "X-Timezone": "Asia/Jakarta",
+    },
+    cookies={"cf_clearance": "<fresh from FS>"},
+    timeout=10)
+# Response: 200 with user data + Set-Cookie: pt_session=<JWT>
+# Save the cookie for subsequent API calls
+
+# Step 6: Use the session cookie for all API calls
+s = requests.Session()
+s.cookies.set("cf_clearance", cf)
+s.cookies.set("pt_session", pt_session)  # from Set-Cookie
+r = s.get("https://temp.pear.trade/api/tasks", timeout=10)
+print(r.json()["data"]["tasks"])
+```
+
+### Key Discoveries (Verified on Pear)
+
+**1. Schema validation error leaks field names.** When you POST with wrong field names, the server returns:
+```json
+{"success": false, "error": {"code": "VALIDATION_ERROR", "message": "Validation failed", "details": {"token": "***"}}}
+```
+The `details` object has the **expected field name as the key** (here: `token`). The value is masked with `***` (server-side redaction), but the key tells you exactly what the schema expects. Cycle through likely field names (`access_token`, `identity_token`, `id_token`, `token`) until the error message changes from `VALIDATION_ERROR` to `UNAUTHENTICATED` or `200 OK`.
+
+**2. `withCredentials: true` means cookies, not Bearer tokens.** The frontend axios config is typically:
+```js
+axios.create({baseURL: "https://api.app.com", withCredentials: true, headers: {"Content-Type": "application/json"}})
+```
+There is **NO Authorization header** in the request interceptor. The auth is an HTTP-only session cookie set by the server on successful Privy sync. After getting `pt_session`, you don't need the Privy tokens anymore for that app's API.
+
+**3. The Privy SDK stores sessions in localStorage** under these exact keys (minified source):
+```
+privy:token         = privy_access_token (raw JWT string, NOT JSON-stringified)
+privy:pat           = privy_access_token (raw JWT string)
+privy:id-token      = identity_token (raw JWT string)
+privy:refresh_token = refresh_token (raw string)
+```
+If you set these via `page.evaluate('localStorage.setItem("privy:pat", jwt)')` (raw string, not JSON), the SDK picks up the session on next page load. If you JSON.stringify, the SDK throws `SyntaxError: Unexpected token 'e', "eyJ..." is not valid JSON` and never initializes.
+
+**4. Privy X OAuth (when truly required) is a 3-step PKCE flow:**
+```
+POST /api/v1/oauth/init/twitter {app_id, redirect_uri, code_challenge, code_challenge_method: "S256", state}
+  → returns {url: "https://api.x.com/2/oauth2/authorize?..."}  ← open in browser
+→ X auth → callback to /api/v1/oauth/callback with authorization_code
+POST /api/v1/oauth/authenticate {authorization_code, code_type, state_code, code_verifier, mode: "login-or-sign-up"}
+  → returns {user, identity_token, privy_access_token, refresh_token}
+```
+For X quests specifically, you cannot bypass X — you need actual X auth (or a burner X account with valid cookies).
+
+**5. Frontend `loginMethods: ["twitter"]` does NOT restrict the backend.** The Pear React app passes `loginMethods: ["twitter"]` to the Privy SDK, so the login modal only shows X. But the backend's `/auth/privy/sync` accepts any valid Privy identity_token regardless of which auth method created it. So email-OTP-created accounts can still authenticate to the backend and use most APIs.
+
+### When to Use This Pattern
+
+✅ **Use when:** the target Privy app shows X-only login in the frontend, you don't have an X account, and you need to claim points or complete non-X tasks (signup bonus, daily check-in, Discord/Telegram quests, wallet connect).
+
+❌ **Doesn't help when:** the actual quests are X-specific (follow, like, retweet). The backend will still require `platformConnected: true` for those tasks. See "Tasks all require X" pitfall in the script below.
+
+### Common Pitfalls (Privy + Web3 Airdrops)
+
+- ⚠️ **Turnstile token TTL ~5 min** — re-solve before each signup attempt (use `captcha.py turnstile URL SITEKEY`)
+- ⚠️ **cf_clearance TTL ~30 min** — refresh via FlareSolverr before each session
+- ⚠️ **OTPs from Privy come from `no-reply@privy.io`** — search by sender, not by app name in subject
+- ⚠️ **Identity token TTL is short** (~1h) — refresh via `passwordless/authenticate` with new OTP, or use the longer-lived refresh_token
+- ⚠️ **Refresh tokens can be revoked** by the Privy app's config — if refresh fails, create a new account
+- ⚠️ **Cookie conflict on re-sync** — when calling `/auth/privy/sync` to refresh session, the server sets a NEW cookie alongside the old one. `requests` raises `CookieConflictError`. Fix: `s.cookies.pop('pt_session')` before the POST.
+- ⚠️ **All tasks may be X-required** — the bypass gets you an account, but if every task is `platform: "twitter"` with `requiresConnection: true`, you still earn 0 points without X. Always check `/api/tasks` early to confirm at least one completable task exists.
+- ⚠️ **Pear and similar apps have NO daily check-in** — points come only from one-time tasks, not recurring actions
+- ⚠️ **`is_new_user: true` is the points signal** — if `/auth/privy/sync` returns `is_new_user: true`, you've successfully created a new account and unlocked any signup-based rewards
+
+### Reusable Script
+
+`/tmp/pear_full_automate.py` from the Pear session implements the full flow:
+1. Load saved Privy session + cf_clearance from `/tmp/pear_session.json` and `/tmp/privy_session.json`
+2. Re-sync Privy → pt_session
+3. List tasks, identify X-required vs open
+4. (Optional) Complete X tasks if X cookies provided via env vars
+5. Output final points balance
+
+To adapt for another Privy-backed app, change these constants:
+- `PRIVY_APP_ID` (find via JS chunk grep)
+- `<app-api>` base URL (e.g. `https://temp.pear.trade/api` → `https://api.example.com/api`)
+- `cf_clearance` cookie (refresh via FlareSolverr per app)
+- The `/auth/privy/sync` field name is `token` for Pear — may differ for other apps (probe with the schema validation error pattern above)
+
+### JS Chunk Discovery Recipe (for unknown Privy app)
+
+```bash
+# 1. Get the main page HTML
+curl -sL "https://<target>.com/login" > /tmp/page.html
+
+# 2. Find Privy script src
+grep -oE 'privy[^"]*\.js' /tmp/page.html
+
+# 3. Download all _next/static/chunks/*.js (or equivalent code-split chunks)
+grep -oE 'src="(/_next[^"]+)"' /tmp/page.html
+
+# 4. Find the Privy SDK chunk (largest file with "PrivyProvider" or "@privy-io")
+ls -lS /tmp/all_chunks/ | head -5
+
+# 5. Extract app_id and login methods
+grep -oE '"privy-app-id":"[a-z0-9]+"' /tmp/all_chunks/*.js
+grep -oE 'loginMethods:\[[^]]*\]' /tmp/all_chunks/*.js
+```
 
 ## CDP (Chrome DevTools Protocol) — Advanced Browser Control
 

@@ -121,6 +121,7 @@ Common gotcha: project claims "min 2GB RAM" → VPS punya 1.9GB → swap 0 → b
 - **ZarPay** (ref.zar.app) — mobile-only + biometric palm KYC, $1 instant Zar
 - **Juno Cash** (juno.cash) — Zcash fork, CPU mining wallet, not really an airdrop
 - **Polymarket** — ongoing, see `polymarket` skill
+- **Pear** (rewards.pear.trade) — copy-trading/social investing, 19.7K X, Privy auth, 11 X-tasks 1000p+1-3x multiplier. See case study in `airdrop-research-pattern.md`
 
 ## Pitfalls
 
