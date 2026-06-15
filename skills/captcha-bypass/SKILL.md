@@ -3,14 +3,45 @@ name: captcha-bypass
 description: "Cloudflare bypass + CAPTCHA solver via 2captcha + cloudscraper + playwright. Also covers browser-based form automation (signup, login) from datacenter IPs."
 ---
 
-# Web Bypass — 2Captcha + Cloudflare + Proxy + Browser Form Automation
+# Web Bypass — CAPTCHA Solving + Cloudflare Bypass + Stealth Browser + Proxy + Form Automation
 
 ## Kapan pakai skill ini
 - Target website pakai Cloudflare (403, 503, challenge, "Just a moment...")
 - Website pakai reCAPTCHA v2/v3, hCaptcha, Turnstile
 - Butuh rotate IP via proxy
 - Agent error `cloudscraper`, `TLS fingerprint`, `bot detected`
-- Browser form automation from datacenter IP (Gmail signup, etc.)
+- Browser form automation from datacenter IP (Gmail signup, airdrop claim, dll)
+- BUTUH stealth browser — JS-injection stealth gak cukup, pake **CloakBrowser** (C++ patches di source level, bukan JS hooks)
+
+## Browser Layer — CloakBrowser (PREFERRED, replaces playwright-stealth)
+
+**Default stealth browser sejak 2026-06-15.** Drop-in Playwright replacement dengan 58 C++ source-level patches. `playwright-stealth` di bawah adalah legacy fallback kalau CloakBrowser gak ada.
+
+```python
+# NEW (preferred) — CloakBrowser
+from cloakbrowser import launch
+browser = launch(headless=True, humanize=True, proxy="http://user:pass@resi:port")
+page = browser.new_page()
+page.goto("https://target.com")
+```
+
+```python
+# OLD (legacy) — playwright-stealth JS injection (kept for backwards compat)
+import asyncio
+from playwright.async_api import async_playwright
+from playwright_stealth import Stealth
+# ... (full pattern below in "Playwright Stealth (legacy)" section)
+```
+
+**CloakBrowser (C++ patched) beats playwright-stealth (JS injection) di semua dimensi:**
+- Tidak bisa di-detect via JS inspection — patches ada di C++ binary, bukan runtime JS
+- Tidak bisa di-reverse dari DevTools — user gak bisa inspect untuk lihat patch
+- Passes behavioral detection (mouse/keyboard timing) via `humanize=True` flag
+- Tested: sannysoft 4/4 passed, all rows "ok", zero "failed" (verified 2026-06-15 VPS 18.143.107.30)
+
+Lokasi skill: `~/.hermes/skills/cloakbrowser/`. Includes smoke + stealth test scripts dan references/bot-detection-sites.md.
+
+**Datacenter IP caveat**: CloakBrowser bypasses fingerprint detection, TAPI gak bisa bypass IP reputation. Cloudflare Turnstile / Kasada / DataDome masih block dari VPS datacenter IP — tetap butuh residential proxy.
 
 ## Dependencies (already installed)
 ```bash
@@ -118,7 +149,9 @@ token = solve_turnstile(site_key, page_url)
 token = solve_image_captcha(image_path="/tmp/captcha.png")
 ```
 
-### Playwright Stealth (hard mode) — CORRECT API
+### Playwright Stealth (legacy) — only use if CloakBrowser unavailable
+
+**CloakBrowser (see top of skill) is preferred.** This section kept for fallback. JS-injection stealth is detectable by inspecting `Runtime.evaluate` of patch scripts; CloakBrowser's C++ patches are not.
 ```python
 import asyncio
 from playwright.async_api import async_playwright
@@ -371,6 +404,46 @@ Kalo user ga paham teknis:
 | Username taken | Try variations with numbers/suffixes |
 | SCTG `ERROR_ZERO_BALANCE` | Top up at sctg.xyz (via bot or support) |
 | SCTG balance negative | Same — needs top up before solving |
+| FlareSolverr container exited silently | `docker ps -a | grep flare` → if `Exited (0) 5h ago`, restart: `docker rm flaresolverr && docker run -d --name flaresolverr -p 8191:8191 --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest` |
+| FlareSolverr times out at 60s on first request | First-time CF challenge solve takes 60-90s. Use `curl --max-time 120` (not 60). For ongoing flow, FlareSolverr with `session.id` can persist cookies but also hits the same timeout on hard challenges — fall back to longer timeout, not a different tool. |
+| cf_clearance from FlareSolverr doesn't work in Playwright | See `cf_clearance-binding` pitfall below. **The cookie binds to the exact TLS + browser fingerprint + IP that solved the challenge — it WILL NOT transfer to a different browser instance, even with the same UA and IP.** |
+
+### ⚠️ cf_clearance Binding — Why You Can't Transfer FlareSolverr Cookies to Playwright (verified 2026-06-15)
+
+**The mistake:** "FlareSolverr solved the challenge, here's a cf_clearance cookie. Drop it into Playwright and we're good, right?" — **No. It won't work.**
+
+**The mechanism:** Cloudflare's `cf_clearance` cookie is bound server-side to:
+- The exact **TLS fingerprint** (JA3/JA4) of the browser that solved the challenge
+- The exact **`User-Agent`** string (mismatch = cookie rejected)
+- The exact **IP address** (datacenter IP got the clearance, so it works there; not a different IP)
+- Often an **anti-replay nonce** tied to the solve session
+
+**The empirical result (2026-06-15, VPS 18.143.107.30):** FlareSolverr returned `cf_clearance: H22uTXKOpy6gqQy6gq...` after a 67-second challenge solve. The same cookie + same UA + same IP dropped into Playwright Chromium headless with `--no-sandbox`:
+- `page.goto("https://rewards.pear.trade/")` → 30s timeout, `__cf_chl_rt_tk=...` challenge injected
+- Even with `webdriver=False` (CloakBrowser patches), still 30s timeout
+- Even with `headers={"User-Agent": "..."}` matching FS, still timeout
+
+**What this means for Privy + CF-protected airdrops (Pear, etc.):**
+You cannot use the pattern "FlareSolverr → cookie → Playwright → do auth". The auth must happen in a session that's already past the challenge, with the same TLS+UA+IP that solved it. Two viable options:
+
+1. **FlareSolverr session mode (`session.id`)** — FlareSolverr opens a persistent Chrome instance and you can do multiple requests through it. The session keeps the challenge-solved cookies alive. **Caveat:** even session mode can time out at 60s on hard challenges. Use longer `maxTimeout` and 1 retry.
+2. **Playwright solves the challenge itself** — load the page in Playwright, wait for the CF challenge to auto-solve (30-60s), then do the auth flow. The browser keeps its own cookies. This is the most reliable path but requires patience. For hard challenges, use CloakBrowser (C++ stealth) instead of `playwright-stealth` (JS injection).
+
+**The third option (don't take it):** rebuild cookies by hand. Cloudflare's cookies include `__cf_bm`, `cf_clearance`, `__cf_chl_rt_tk` — the latter is a per-request challenge nonce that **cannot** be predicted. Don't try.
+
+**The diagnostic test (5 sec) to know which option applies:** when FlareSolverr gives you a cookie, immediately try a curl with that cookie:
+```bash
+curl -sL --max-time 10 "https://target.com/" \
+  -b "cf_clearance=<THE_COOKIE>" \
+  -A "<THE_FS_UA>" \
+  -H "Accept: text/html" \
+  -o /dev/null -w "%{http_code}\n"
+# If 200/403 (page rendered or blocked) → cookie works for that IP+UA+TLS combo
+# If 403 with "Attention Required" / cf-mitigated → cookie is stale or bound to a different fingerprint
+# If 503 / "Just a moment" / Ray ID present → challenge re-injected, cookie REJECTED
+```
+
+**Rule of thumb:** cf_clearance cookies are session-scoped, not portable. Plan the auth flow to use ONE tool from challenge solve to API call — don't try to hop tools mid-flow.
 
 ## OTP-Based Auth Flows (e.g., Vinci World, Magic Links)
 

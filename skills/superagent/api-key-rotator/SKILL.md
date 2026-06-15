@@ -99,6 +99,97 @@ The script:
 4. Updates `~/.hermes/config.yaml` (provider, model, base_url, api_key)
 5. Hermes hot-reloads on next request (no gateway restart needed)
 
+### Unified CLI: `apikeys` (one-stop key management)
+
+For a single, ergonomic front-end over the pool + config, use the `apikeys`
+CLI (installed at `~/bin/apikeys` or `/usr/local/bin/apikeys`). It wraps
+`api-key-pool.json` + `config.yaml` + the `switch-model` and `rotate` scripts
+into a single command surface — `apikeys` is the recommended way for the
+operator to manage keys interactively, and the `apikeys_cli.py` reference
+implementation is in `scripts/apikeys_cli.py` of this skill.
+
+**All commands:**
+
+```bash
+apikeys                    # default: list all keys (alias for `apikeys list`)
+apikeys list               # all keys + status table with model + URL
+apikeys current            # show currently active key
+apikeys status             # pool summary (total, active, inactive, current idx)
+apikeys stats              # usage bars per key (visual)
+apikeys models [id]        # list available models for a key (or all)
+
+apikeys test <id>          # test a single key (HTTP probe, ~2s)
+apikeys test-all           # test all keys, report working/failed counts
+
+apikeys rotate             # rotate to next active key
+apikeys switch <id>        # jump to specific key (updates current_index)
+apikeys enable <id>        # mark key as active
+apikeys disable <id>       # mark key as inactive (excluded from rotation)
+
+apikeys add                # interactive add (prompts for provider/url/key/model)
+apikeys remove <id>        # remove key from pool
+
+apikeys help               # full help
+```
+
+**Example session:**
+
+```
+$ apikeys list
+┌──────┬──────────┬──────────┬─────────┬────────────┬────────────┐
+│ idx  │ id       │ model    │ status  │ uses       │ last_used  │
+├──────┼──────────┼──────────┼─────────┼────────────┼────────────┤
+│  0⭐ │ aero-1   │ claude.. │ ✅ active│ 0          │ never      │
+│  1   │ mimo-3   │ mimo-v2.5│ ✅ active│ 2          │ 2026-06-14 │
+│  2   │ kimchi-1 │ kimi-k2.6│ ✅ active│ 2          │ 2026-06-14 │
+│ ...                                                              │
+└──────┴──────────┴──────────┴─────────┴────────────┴────────────┘
+
+$ apikeys test-all
+🧪 Testing 8 keys
+  Testing aero-1...    ❌ HTTP 305
+  Testing mimo-3...    ✅ 1913ms
+  ...
+✅ 2 working  |  ❌ 6 failed  |  Total: 8
+
+$ apikeys switch mimo-3
+✅ Switched to mimo-3 (index 1)
+⭐ Current Active: mimo-3
+   Model: mimo-v2.5-pro
+   URL:   https://token-plan-sgp.xiaomimimo.com/v1
+   Key:   tp-sfldo4x...zb
+   Used:  0 times
+```
+
+**The `apikeys` CLI vs. the lower-level `api_key_rotator.py` script:**
+
+| Need | Tool |
+|------|------|
+| Interactive: list/test/switch/rotate | `apikeys` (color, table, ergonomic) |
+| Scripted/automation: add/remove/fail/success | `api_key_rotator.py <verb> ...` |
+| Hot-reload Hermes after key change | `auto_rotate.sh` or `rotate_now.sh` |
+| Programmatic in Python: get current key | `api_key_rotator.py get primary` → JSON |
+
+`apikeys` is the operator-facing CLI; `api_key_rotator.py` is the programmatic
+API. Both read/write the same `~/.hermes/api-key-pool.json` so they don't
+conflict.
+
+**Install/upgrade:**
+
+```bash
+# Already installed at ~/bin/apikeys (20KB Python)
+# To install in a new env:
+cp scripts/apikeys_cli.py ~/bin/apikeys
+chmod +x ~/bin/apikeys
+ln -sf ~/bin/apikeys /usr/local/bin/apikeys
+```
+
+**When NOT to use `apikeys`:**
+- For automated/headless key rotation on chat trigger ("rotate" / "ganti key")
+  → use `~/bin/rotate` (existing rotate-now CLI that does hot-reload).
+- For Hermes internal rotation on error → still `api_key_rotator.py fail
+  primary <id> <error_type>` (called by error handlers).
+
 ### Manual Pool Management
 
 ```bash
@@ -369,7 +460,57 @@ providers:
 
 **CLI alternative (zero-config)**: install Kimchi CLI v0.1.17 from `castai/kimchi` GitHub, configure `~/.config/kimchi/config.json` with API key, then `kimchi claude --model kimi-k2.6` works out of the box. The CLI itself sets the right UA. See `references/kimchi-cli-config.md` for setup.
 
-### CastAI provider credits exhausted (June 2026, system-wide)
+### Tor Bypass Test Pattern (CRITICAL for diagnosing 403 vs 402, 2026-06-15)
+
+When Kimchi/CastAI returns 403 from VPS, the question is always: "is this an IP block or a provider issue?" The answer determines whether to wait, retry, or declare the key dead.
+
+**Direct IP test (VPS):**
+```bash
+# From VPS — what you'll typically see:
+curl -s -w "HTTP:%{http_code}\n" \
+  "https://llm.kimchi.dev/openai/v1/chat/completions" \
+  -H "Authorization: Bearer castai_v1_..." \
+  -H "Content-Type: application/json" \
+  -d '{"model":"kimi-k2.6","messages":[{"role":"user","content":"hi"}],"max_tokens":5}'
+# → 403 "error code: 1010" (CF block) or 200 OK (works)
+```
+
+**Tor bypass test (definitive diagnosis):**
+```bash
+# Via Tor — bypasses VPS IP, hits CastAI from a Tor exit node:
+torsocks curl -s -m 20 -w "HTTP:%{http_code}\n" \
+  "https://llm.kimchi.dev/openai/v1/chat/completions" \
+  -H "Authorization: Bearer castai_v1_..." \
+  -H "Content-Type: application/json" \
+  -d '{"model":"kimi-k2.6","messages":[{"role":"user","content":"hi"}],"max_tokens":5}'
+```
+
+**Reading the result (definitive 4-way classification):**
+
+| Direct | Tor | Diagnosis | Action |
+|---|---|---|---|
+| 200 OK | 200 OK | All good | Use key |
+| 200 OK | 200 OK | Working | Use key |
+| 403 (1010) | 200 OK | **IP-block on VPS only** | Key valid, keep in pool, wait for CF to lift |
+| 403 (1010) | 402 (exhausted) | **Provider-wide outage, NOT IP issue** | Keys valid but CastAI upstream out of credits — disable pool-wide, wait for CastAI refill |
+| 403 (1010) | 403 (1010) | **CastAI itself blocking Tor exit nodes** | Keys valid but CastAI rejecting both VPS and Tor — no easy bypass |
+| 401 | 401 | Key invalid | **Remove from pool immediately** |
+
+**The 2026-06-15 finding:** All 4 Kimchi keys returned 403 from VPS 18.143.107.30, AND 402 via Tor with 8 different models tested. The conclusion: **CastAI upstream vendor pool is exhausted globally** (not IP-block). Keys are valid but the provider has no $$ to pay GPU vendors. This will only recover when CastAI refills its upstream credits.
+
+**Why both 403 (direct) and 402 (Tor) tell the same story:**
+- 403 (1010) from VPS = Cloudflare blocks VPS IP for that endpoint
+- 402 from Tor = CastAI itself has no credits, so the request is rejected at the model layer
+- Both happening simultaneously across all keys/models = systemic CastAI issue
+
+**Tor alternative URL:** `https://api.tokenrouter.com/v1` is a different CastAI service. Kimchi keys return 401 there (different namespace). Don't try this URL for Kimchi keys.
+
+**When to keep keys vs disable:**
+- 403 (IP block) + 402 (exhausted) → **disable pool-wide**, wait for CastAI refill
+- 403 (IP block) + 200 OK (Tor) → keep keys, work around IP block via worker proxy
+- 401 (anywhere) → remove key
+
+## CastAI provider credits exhausted (June 2026, system-wide)
 
 As of 2026-06-13, CastAI's upstream vendor pool is **globally empty**:
 - 7 models return **402 "the provider for model X has exhausted its credits and cannot be used"**: `kimi-k2.6`, `kimi-k2.5`, `minimax-m2.7`, `minimax-m3`, `minimax-m2.5`, `nemotron-3-super-fp4`, `nemotron-3-ultra-fp4`
@@ -377,6 +518,7 @@ As of 2026-06-13, CastAI's upstream vendor pool is **globally empty**:
 - User's CastAI account balance stays intact; you can't transfer funds to upstream vendors
 - **Ganti model tidak ngaruh** — semua 402 sampai CastAI refill vendor pool
 - Same error from all 4 Kimchi keys + tested via Tor (3 retries × 10 models = 30/30 consistent)
+- **Confirmed 2026-06-15 via Tor bypass**: 402 on all chat models via Tor, but `/models` endpoint still returns 200 OK with full model list (proves auth works, but provider has no credits)
 - Test pattern: see `scripts/provider-health-check.py` which probes all keys × all models and classifies errors
 
 **Real fixes (in order of speed):**
@@ -632,6 +774,13 @@ Config hot-reloads on next request — no gateway restart needed for key changes
    17. **VPS SSH password auth** — Modern VPS providers (AWS, Vultr, DO) often disable password auth by default. If SSH with password fails, need to: (a) use key-based auth, (b) install `sshpass` from VPS shell first, or (c) use `expect` script. User prefers agent to execute directly, not just send scripts.
 16. **Provider cleanup preference** — User prefers removing dead/non-working keys from pool immediately. When a key returns 401 (invalid) for >48h, remove it from pool. For 403 (IP block), keep the key but note the IP status — the key itself is still valid.
 17. **`hermes chat` auto-injects `extra_body.reasoning` — breaks strict-schema Anthropic-compatible providers** (Aerolink, LiteLLM strict-mode, custom gateways). The agent's `chat_completion_helpers.py:1343-1353` always adds `reasoning: {enabled: True, effort: "medium"}` (or `agent.reasoning_config` if set) to Anthropic API calls. Providers that reject non-Anthropic fields return `400 "Extra inputs are not permitted"`. Direct SDK calls work; agent-mediated calls fail. **Fix options:** (A) use direct SDK wrapper (`scripts/aero_chat.py` pattern), (B) set `agent.reasoning_effort: none` in config (still adds the field, but with `enabled: False` — also rejected by Aerolink schema), (C) wait for upstream Hermes patch. See `references/aerolink-claude.md` for full breakdown.
+18. **`apikeys test-all` is READ-ONLY — never auto-mutate** (operator directive 2026-06-14). The `test-all` command reports working/failed but **does not** auto-disable dead keys. Workflow:
+   - Run `apikeys test-all` → see results
+   - Operator reviews output
+   - Manually run `apikeys disable <id>` for each dead key
+   - **Why**: Operator wants explicit control. Test failures may be transient (rate limit, IP block) and disabling on auto would lose recoverable keys. The `apikeys rotate` command is the only one that mutates the active key index.
+   - Exception: `apikeys test <id>` and the one-shot `fail primary <id>` from `api_key_rotator.py` (called by error handlers) DO mutate — they're per-key targeted actions.
+   - Same pattern for ClipVault `clipvault test` — reports wallet/config health, doesn't change anything.
 
 ## Cloudflare Worker Proxy for Blocked Providers
 
