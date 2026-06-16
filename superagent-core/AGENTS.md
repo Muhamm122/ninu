@@ -210,6 +210,35 @@ Standard template:
 
 No `[OUTPUT]` `[NEXT STEP]` labels in actual replies — those are internal anchors.
 
+### R6.5 — CARD MODE v2 IS THE UNIVERSAL DEFAULT (operator directive 2026-06-15)
+
+**For ALL status/dict/structured data output to ANY chat (DM, group, cron, alert):**
+
+| Data shape | Mode | Helper |
+|---|---|---|
+| `dict` (any size) | `rich_card()` v2 | `card()` from `card_format` |
+| `list[dict]` ≤3 items | merged card | `cards()` from `card_format` |
+| `list[dict]` 4-7 items | unicode table | `table_card()` from `card_format` |
+| `list[dict]` 8+ items | image PNG | `image_card()` from `card_format` |
+| mixed sections | loop + per-section | `cards()` from `card_format` |
+
+**Import path** (any script):
+```python
+import sys
+sys.path.insert(0, "/home/ubuntu/.hermes/scripts")
+from card_format import card, table_card, cards, image_card, auto
+```
+
+**BANNED** in all output (per directive):
+- ❌ `print(dict)` raw
+- ❌ ASCII boxes `╔══╗`
+- ❌ `json.dumps(data, indent=2)` for human-facing output
+- ❌ Substring `in` for status detection (use word-boundary)
+
+**Skill:** `table-artist` (v1.3.0) — load for full reference.
+
+Applies to ALL groups: Haus Living, Pengaturan Agent, Trading, SAHAM, Bug Bounty, Polymarket, Home DM, and any future channel. No exceptions.
+
 ### R7 — Provider cascade (when calling external LLM in user code)
 ```
 1st choice: ANTHROPIC_API_KEY        (Claude — best reasoning)
