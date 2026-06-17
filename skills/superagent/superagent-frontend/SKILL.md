@@ -295,6 +295,57 @@ ssh user@vps 'sudo nginx -t && sudo systemctl reload nginx'
 
 ---
 
+## Offline-First Single-File Pattern (no CDN, file:// portable)
+
+When the deliverable must work **without internet** (VPS air-gapped, file:// preview, share via Telegram/email attachment, restricted network, or "100% offline" user requirement), use a **split-source + Python build script** approach instead of CDN tags.
+
+```
+src/                  # what you author
+  style.css
+  body.html            # HTML skeleton with token placeholders
+  app.js
+libs/                 # downloaded once
+  chart.umd.min.js
+  xlsx.full.min.js
+build.py              # assembles dist/dashboard.html
+```
+
+The build script:
+- Reads each source file as **bytes** (`open(p, 'rb').read()`)
+- Decodes with `errors='replace'` so multi-byte chars survive
+- Escapes `</script>` → `<\/script>` inside JS body before inlining (otherwise HTML parser terminates the script tag early)
+- Replaces placeholder tokens like `/* @@STYLE@@ */`, `/* @@APP@@ */` with file contents
+- Writes a single self-contained `dist/dashboard.html`
+
+**Use this when:**
+- Target is `file://` or behind a strict no-CDN firewall
+- User wants one HTML file sharable via Telegram/email
+- Stays under ~3 MB after libs inlined
+- No build pipeline / no Node available on target machine
+- User explicitly says "100% offline" / "no CDN" / "gak boleh online"
+
+**Don't use this when:**
+- Real-time data needed (bake a JSON file at build time, or use XLSX/CSV import for user-supplied data)
+- >3 MB libs needed (e.g. TensorFlow.js) — switch to React + Vite build
+- SEO matters (no SSR)
+- Team needs to maintain code post-handoff (split source is harder to onboard new devs)
+
+**Verification recipe (use Playwright headless, no GUI):**
+```python
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    page = browser.new_page()
+    page.goto(f'file://{html_path}')
+    page.wait_for_load_state('networkidle')
+    assert page.evaluate('typeof Chart') == 'function', "Chart.js not loaded"
+    assert page.locator('.kpi-value').first.is_visible()
+    page.screenshot(path='verify.png', full_page=True)
+    browser.close()
+```
+
+See `references/offline-html-build.md` for the full build script template, the **SheetJS decode quirk** (951 KB on disk → 709 KB decoded is NORMAL), and the `</script>` escape pattern. See `references/gsheet-html-dashboard.md` for the Google Apps Script HTML service variant (single-file dashboard that reads from a Google Sheet).
+
 ## Constraints
 
 - Mobile-first — design at 375px first, scale up
@@ -303,3 +354,4 @@ ssh user@vps 'sudo nginx -t && sudo systemctl reload nginx'
 - Tailwind unless operator specifies otherwise
 - Forms: client-side validation + server-side validation both
 - Web3: never store private keys in frontend — read-only or wallet-connect only
+- Offline-first pattern: pick CDN or offline-upfront — never mix halfway (a half-offline build is harder to debug than either extreme)

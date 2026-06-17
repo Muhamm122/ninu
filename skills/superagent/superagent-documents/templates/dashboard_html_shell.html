@@ -1,0 +1,328 @@
+<!--
+  Self-contained HTML dashboard template (offline-first).
+
+  REPRODUCE WITH MODIFICATIONS:
+  1. curl -s https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js > chart_inline.js
+  2. curl -s https://cdn.jsdelivr.net/npm/xlsx@0.20.3/dist/xlsx.full.min.js > xlsx_inline.js
+  3. Replace {{CHART_INLINE}} and {{XLSX_INLINE}} with the file contents inside <script>...</script>
+  4. Replace {{DATA_JSON}} with your sample data
+  5. Replace {{STYLES}} with your dashboard CSS
+  6. Replace {{JS_LOGIC}} with your dashboard JS
+  7. Save as .html — works fully offline
+-->
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Inlined Chart.js — replace with full file contents for offline use -->
+  <script>{{CHART_INLINE}}</script>
+  <!-- Inlined SheetJS — replace with full file contents for offline use -->
+  <script>{{XLSX_INLINE}}</script>
+  <style>
+    :root {
+      --bg: #0F172A;
+      --surface: #1E293B;
+      --text: #F1F5F9;
+      --muted: #94A3B8;
+      --border: #334155;
+      --accent: #3B82F6;
+    }
+    :root[data-theme="light"] {
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --text: #0F172A;
+      --muted: #64748B;
+      --border: #E2E8F0;
+    }
+    * { box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; margin: 0; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+    .tab { padding: 10px 16px; cursor: pointer; border: none; background: transparent; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .kpi { padding: 16px; border-radius: 8px; }
+    .kpi .label { font-size: 11px; text-transform: uppercase; color: var(--muted); }
+    .kpi .value { font-size: 24px; font-weight: bold; margin-top: 4px; }
+    .kpi .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { font-size: 11px; text-transform: uppercase; color: var(--muted); }
+    .btn { padding: 8px 16px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .theme-toggle { position: fixed; top: 16px; right: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h1>💰 {{TITLE}}</h1>
+      <button class="btn btn-secondary theme-toggle" onclick="toggleTheme()">🌓</button>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="dashboard">📊 Dashboard</button>
+      <button class="tab" data-tab="transaksi">📋 Transaksi</button>
+      <button class="tab" data-tab="goals">🎯 Goals</button>
+      <button class="tab" data-tab="investasi">💼 Investasi</button>
+      <button class="tab" data-tab="laporan">📑 Laporan</button>
+    </nav>
+
+    <section class="tab-content active" id="tab-dashboard">
+      <div class="kpi-row" id="kpi-row"></div>
+      <div class="chart-grid">
+        <div class="card"><h4>Income vs Expense</h4><canvas id="barChart" style="max-height:280px"></canvas></div>
+        <div class="card"><h4>Expense by Category</h4><canvas id="pieChart" style="max-height:280px"></canvas></div>
+      </div>
+    </section>
+
+    <section class="tab-content" id="tab-transaksi">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div>
+            <input type="month" id="filterMonth" onchange="renderTable()" />
+            <button class="btn btn-secondary" onclick="exportCSV()">📤 Export CSV</button>
+            <label class="btn btn-secondary" style="cursor:pointer">
+              📥 Import <input type="file" accept=".xlsx,.csv" style="display:none" onchange="importFile(event)">
+            </label>
+          </div>
+        </div>
+        <table id="txTable">
+          <thead><tr><th>Tanggal</th><th>Tipe</th><th>Kategori</th><th>Jumlah</th><th>Catatan</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="tab-content" id="tab-goals">
+      <div class="card" id="goalsCard"></div>
+    </section>
+
+    <section class="tab-content" id="tab-investasi">
+      <div class="card" id="invCard"></div>
+    </section>
+
+    <section class="tab-content" id="tab-laporan">
+      <div class="card">
+        <h4>📈 Trend Net Bulanan</h4>
+        <canvas id="lineChart" style="max-height:300px"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // === STATE ===
+    const STORAGE_KEY = '{{NAMESPACE}}'; // versioned: e.g. laporan_keuangan_v2
+    let data = loadData();
+
+    function loadData() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+      return {{DATA_JSON}};
+    }
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    // === THEME ===
+    function toggleTheme() {
+      const html = document.documentElement;
+      html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem(STORAGE_KEY + '_theme', html.dataset.theme);
+    }
+    (function() {
+      const t = localStorage.getItem(STORAGE_KEY + '_theme');
+      if (t) document.documentElement.dataset.theme = t;
+    })();
+
+    // === TABS ===
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        // Re-render on tab switch
+        if (btn.dataset.tab === 'dashboard') renderDashboard();
+        if (btn.dataset.tab === 'transaksi') renderTable();
+        if (btn.dataset.tab === 'goals') renderGoals();
+        if (btn.dataset.tab === 'investasi') renderInvestments();
+        if (btn.dataset.tab === 'laporan') renderLaporan();
+      });
+    });
+
+    // === RENDER: Dashboard ===
+    const fmt = n => 'Rp ' + (n/1e6).toFixed(2) + 'jt';
+    const fmtFull = n => 'Rp ' + n.toLocaleString('id-ID');
+
+    function renderDashboard() {
+      const tx = (data.transaksi || []).filter(t => t.tanggal);
+      const totalIn = tx.filter(t => t.tipe === 'Pemasukan').reduce((s,t) => s + t.jumlah, 0);
+      const totalOut = tx.filter(t => t.tipe === 'Pengeluaran').reduce((s,t) => s + t.jumlah, 0);
+      const net = totalIn - totalOut;
+      const savings = totalIn > 0 ? (net / totalIn * 100) : 0;
+      const kpis = [
+        {l:'Pemasukan',  v:fmt(totalIn),  s:tx.filter(t=>t.tipe==='Pemasukan').length+' tx', c:'#10B981'},
+        {l:'Pengeluaran',v:fmt(totalOut), s:tx.filter(t=>t.tipe==='Pengeluaran').length+' tx', c:'#EF4444'},
+        {l:'Net',        v:fmt(net),      s:'Savings '+savings.toFixed(1)+'%', c:'#3B82F6'}
+      ];
+      document.getElementById('kpi-row').innerHTML = kpis.map(k =>
+        `<div class="kpi card" style="border-left:4px solid ${k.c}">
+          <div class="label">${k.l}</div>
+          <div class="value" style="color:${k.c}">${k.v}</div>
+          <div class="sub">${k.s}</div>
+        </div>`).join('');
+
+      // Bar chart - monthly
+      const byMonth = {};
+      tx.forEach(t => {
+        const m = (typeof t.tanggal === 'string' ? t.tanggal : t.tanggal.toISOString()).slice(0,7);
+        if (!byMonth[m]) byMonth[m] = {income:0, expense:0};
+        if (t.tipe === 'Pemasukan') byMonth[m].income += t.jumlah;
+        else byMonth[m].expense += t.jumlah;
+      });
+      const months = Object.keys(byMonth).sort();
+      new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: { labels: months,
+          datasets: [
+            {label:'Pemasukan', data: months.map(m => byMonth[m].income), backgroundColor:'#10B981'},
+            {label:'Pengeluaran', data: months.map(m => byMonth[m].expense), backgroundColor:'#EF4444'}
+          ]},
+        options: {responsive: true, maintainAspectRatio: false}
+      });
+
+      // Pie chart - category
+      const byCat = {};
+      tx.filter(t => t.tipe === 'Pengeluaran').forEach(t => {
+        byCat[t.kategori] = (byCat[t.kategori] || 0) + t.jumlah;
+      });
+      new Chart(document.getElementById('pieChart'), {
+        type: 'doughnut',
+        data: { labels: Object.keys(byCat), datasets: [{ data: Object.values(byCat) }] },
+        options: {responsive: true, maintainAspectRatio: false}
+      });
+    }
+
+    // === RENDER: Transaksi table ===
+    function renderTable() {
+      const filterMonth = document.getElementById('filterMonth').value;
+      const tx = (data.transaksi || []).filter(t => t.tanggal && (!filterMonth || t.tanggal.startsWith(filterMonth)));
+      const tbody = document.querySelector('#txTable tbody');
+      tbody.innerHTML = tx.map(t => `<tr>
+        <td>${t.tanggal}</td>
+        <td>${t.tipe}</td>
+        <td>${t.kategori}</td>
+        <td style="text-align:right">${fmtFull(t.jumlah)}</td>
+        <td>${t.catatan || ''}</td>
+      </tr>`).join('');
+    }
+
+    // === RENDER: Goals ===
+    function renderGoals() {
+      const goals = data.goals || [];
+      document.getElementById('goalsCard').innerHTML = '<h4>🎯 Financial Goals</h4>' +
+        goals.map(g => {
+          const pct = (g.current / g.target * 100);
+          return `<div style="margin:12px 0">
+            <div style="display:flex;justify-content:space-between">
+              <b>${g.nama}</b><span>${pct.toFixed(1)}%</span>
+            </div>
+            <div style="background:var(--border);height:8px;border-radius:4px;overflow:hidden;margin:4px 0">
+              <div style="background:var(--accent);height:100%;width:${Math.min(pct,100)}%"></div>
+            </div>
+            <small style="color:var(--muted)">${fmtFull(g.current)} / ${fmtFull(g.target)} — Deadline: ${g.deadline}</small>
+          </div>`;
+        }).join('');
+    }
+
+    // === RENDER: Investments ===
+    function renderInvestments() {
+      const invs = data.investments || [];
+      document.getElementById('invCard').innerHTML = '<h4>💼 Portofolio</h4>' +
+        '<table><thead><tr><th>Nama</th><th>Jenis</th><th>Modal</th><th>Nilai</th><th>Return</th></tr></thead><tbody>' +
+        invs.map(inv => {
+          const ret = ((inv.nilai - inv.modal) / inv.modal * 100);
+          const color = ret >= 0 ? '#10B981' : '#EF4444';
+          return `<tr>
+            <td>${inv.nama}</td><td>${inv.jenis}</td>
+            <td style="text-align:right">${fmtFull(inv.modal)}</td>
+            <td style="text-align:right">${fmtFull(inv.nilai)}</td>
+            <td style="text-align:right;color:${color}">${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%</td>
+          </tr>`;
+        }).join('') + '</tbody></table>';
+    }
+
+    // === RENDER: Laporan (line chart) ===
+    function renderLaporan() {
+      const tx = (data.transaksi || []).filter(t => t.tanggal);
+      const byMonth = {};
+      tx.forEach(t => {
+        const m = (typeof t.tanggal === 'string' ? t.tanggal : t.tanggal.toISOString()).slice(0,7);
+        if (!byMonth[m]) byMonth[m] = {income:0, expense:0};
+        if (t.tipe === 'Pemasukan') byMonth[m].income += t.jumlah;
+        else byMonth[m].expense += t.jumlah;
+      });
+      const months = Object.keys(byMonth).sort();
+      new Chart(document.getElementById('lineChart'), {
+        type: 'line',
+        data: { labels: months,
+          datasets: [{
+            label: 'Net',
+            data: months.map(m => byMonth[m].income - byMonth[m].expense),
+            borderColor: '#3B82F6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            fill: true
+          }]},
+        options: {responsive: true, maintainAspectRatio: false}
+      });
+    }
+
+    // === EXPORT / IMPORT ===
+    function exportCSV() {
+      const rows = [['Tanggal','Tipe','Kategori','Jumlah','Akun','Catatan']];
+      (data.transaksi || []).filter(t => t.tanggal).forEach(t => {
+        rows.push([t.tanggal, t.tipe, t.kategori, t.jumlah, t.akun||'', t.catatan||'']);
+      });
+      const csv = rows.map(r => r.map(c => `"${(c||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'transaksi.csv'; a.click();
+    }
+    function importFile(event) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header: 1});
+        const headers = rows[0].map(h => h.toLowerCase());
+        const newTx = rows.slice(1).filter(r => r[0]).map(r => {
+          const obj = {};
+          headers.forEach((h, i) => obj[h] = r[i]);
+          obj.jumlah = Number(obj.jumlah) || 0;
+          obj.kategori = (obj.kategori || '').toString().toLowerCase();
+          return obj;
+        });
+        data.transaksi = (data.transaksi || []).concat(newTx);
+        saveData();
+        alert(`✅ ${newTx.length} transaksi diimport!`);
+        renderDashboard();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // === INIT ===
+    renderDashboard();
+  </script>
+</body>
+</html>

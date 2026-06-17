@@ -360,6 +360,7 @@ These are **IP reputation blocks** that happen BEFORE any CAPTCHA is shown. YesC
 | **X/Twitter httpOnly cookies** | Hermes Playwright has no CDP port access; document.cookie can't set httpOnly cookies | All X browser auth from VPS | Use x_tool.py (requests) instead; works with or without WARP |
 | `X/Twitter v1.1 API` | `api.x.com/1.1/` endpoints return 404 (not 401) — fully decommissioned as of 2026-06 | Any code using v1.1 REST endpoints | Use GraphQL (`api.x.com/graphql/`) exclusively |
 | **Lakera Gandalf / CTF challenges** | Connection timeout (no HTTP response at all) | Before any page load or API call | Residential proxy or run from non-datacenter IP |
+| **HackerOne web login** (`hackerone.com/users/sign_in`) | "Just a moment..." with `cf-turnstile-response` hidden input, page never renders email field | Before login form (CF challenge) | (a) residential proxy, OR (b) **user generates API token manually in their browser** (~30s, paste identifier+token) — see `offsec-toolkit/references/h1-api-token-setup.md` |
 | **Google OAuth login** | "This browser or app may not be secure" | At email entry | Residential proxy only |
 | **NVIDIA NIM** | hCaptcha loop / block | At signup | Residential proxy or manual from phone |
 

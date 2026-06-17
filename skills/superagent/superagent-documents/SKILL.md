@@ -232,3 +232,143 @@ img.save('avatar.png', optimize=True)
 - Filenames descriptive: `q3-revenue-analysis.xlsx` not `output.xlsx`
 - One specific edit offer after delivery, not generic "any changes?"
 - For multi-file deliverables: bundle into zip when > 3 files
+
+---
+
+## Multi-Format Dashboard Deliverable (HTML + XLSX + Apps Script)
+
+When the user wants to "build a dashboard" / "laporan" / "tracker" / "spreadsheet with charts" — they almost always need 3 formats: **viewable in browser** (HTML), **editable in Excel** (XLSX), and **shareable / collaborative** (Google Sheets). Default to building all 3 unless they explicitly say "cukup satu".
+
+### Format split
+
+| Format | Role | Library / API |
+|---|---|---|
+| HTML standalone | Visual dashboard, mobile, offline-ready | Tailwind CDN + Chart.js + SheetJS (all inlined for offline) |
+| XLSX | Local editing, business users, formulas | openpyxl with multi-sheet + charts + conditional formatting |
+| Apps Script | Cloud collaboration, mobile editing, no install | HtmlService sidebar + onOpen menu + server functions |
+
+### Shared data shape
+
+Keep ONE source of truth (e.g. `sample_data.json`) and derive all 3 formats from it. Categories use lowercase IDs (e.g. `makanan` not `Makanan`) to avoid case-mismatch between source data and CATS_INC/CATS_EXP dicts. Always normalize:
+
+```python
+for t in TX: t["kategori"] = t["kategori"].lower()
+```
+
+### HTML standalone pattern (offline-first)
+
+**Inlining strategy**: copy minified Chart.js + SheetJS from CDN URLs into `<script>` tags inside the HTML. End file is ~1-1.5MB but works without internet. Use this when user might open the file on a different machine, send it via Telegram, or store it on USB.
+
+```bash
+# Get minified libs once
+curl -s https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js > chart_inline.js
+curl -s https://cdn.jsdelivr.net/npm/xlsx@0.20.3/dist/xlsx.full.min.js > xlsx_inline.js
+# Then paste each file's content into <script>...</script> blocks in the HTML
+```
+
+Tailwind stays as CDN (small, can't reasonably inline the JIT compiler). For dark/light theme, use CSS variables on `:root[data-theme="dark"]` — instant switch without re-render.
+
+**Multi-tab navigation**: single page, `display: none` on inactive sections, `class="active"` on current tab + section. localStorage key namespace the version: `laporan_keuangan_v2` not `laporan_keuangan` to avoid clobbering v1 data.
+
+### XLSX multi-sheet pattern (openpyxl)
+
+Beyond basic tables, the user almost always wants: KPI cards, charts, conditional formatting, and formulas that survive row additions. Reference: `templates/dashboard_xlsx.py` and `references/multi-format-dashboard.md`.
+
+Key patterns:
+- **KPI cards**: 2-column merged cells per metric, with header band (color) + value cell (large font) + sublabel. Use `ws.merge_cells(f'{sc}4:{ec}4')` with explicit col letters from `get_column_letter()` — single-char tuple like `('A','B')` is NOT a valid range and raises `ValueError`.
+- **Charts**: `BarChart`, `PieChart`, `LineChart`, `DoughnutChart` from `openpyxl.chart`. Add via `ws.add_chart(chart, "E8")` for anchor position.
+- **Conditional formatting**: `ColorScaleRule(start_type='num', start_value=0, start_color='C6EFCE', ...)` for gradient (e.g. budget usage 0% green → 100% red).
+- **Formulas**: `=SUMIF(B:B,"Pemasukan",E:E)` for conditional sums. `=D/C` for progress ratio with `0.0%` format. `=G-H` for P/L.
+- **Freeze panes**: `ws.freeze_panes = 'A3'` keeps header visible.
+- **Number format**: `'"Rp "#,##0'` for IDR currency (note the literal "Rp" prefix inside quotes).
+
+### Apps Script dashboard pattern (Google Sheets)
+
+The full setup → in-spreadsheet sidebar flow. Reference code (CONFIG, onOpen menu, setupTemplate, getDashboardData, modal form, sidebar HTML with Chart.js) is in `references/multi-format-dashboard.md` — copy the Kode.gs and dashboard.html sections to bootstrap.
+
+Architecture:
+1. **`Kode.gs` (server)**: `CONFIG` object with sheet names, category/goal/investment constants, `onOpen()` that adds custom menu, `setupTemplate()` that creates all sheets + sample data + charts in one click, CRUD dialog functions (`showAddTxDialog`, `addTransaction`, etc.), `getDashboardData()` that reads from `Transaksi` sheet and returns the whole payload to the client.
+2. **`dashboard.html` (client)**: Sidebar rendered via `HtmlService.createHtmlOutputFromFile('dashboard')`. Uses `google.script.run.withSuccessHandler(...).getDashboardData()` to fetch data, then renders all charts/tables client-side with Chart.js (CDN OK — Apps Script allows CDN in HtmlService).
+3. **Menu structure**:
+   ```
+   💰 Laporan Keuangan
+   ├── 🚀 Setup Template
+   ├── 📊 Refresh Dashboard
+   ├── ➕ Tambah Transaksi
+   ├── 📁 Data
+   │   ├── 📥 Import dari CSV
+   │   ├── 📤 Export ke CSV
+   │   └── 🗑️ Reset ke Sample
+   ├── 🏷️ Master
+   │   ├── ➕ Kategori Income / Expense
+   │   ├── 🏦 Tambah Akun
+   │   └── 🎯 Tambah Goal
+   └── 🌐 Buka Dashboard (sidebar)
+   ```
+
+4. **Setup template pattern**: For each sheet, call a dedicated `createXxxSheet(ss)` function. Each function: hides gridlines (`setHiddenGridlines(true)`), sets title row with `merge()` + dark fill + white font, builds header row with `setValues([[...]])` + bold, then iterates data with explicit row index counter (don't trust `getLastRow()` mid-build). Charts via `ws.newChart().setChartType(Charts.ChartType.PIE).addRange(...).setPosition(r, c, 0, 0).build()`.
+
+5. **Modal dialog form pattern**: For CRUD, generate inline HTML in a template literal, return via `HtmlService.createHtmlOutput(html).setWidth(420).setHeight(620)`. Form submission calls `google.script.run.withSuccessHandler(r => { alert(...); google.script.host.close(); }).serverFunction(data)`.
+
+6. **Sidebar (vs modal)**: Use sidebar for the dashboard itself (`setWidth(1400).setHeight(900).setTitle(...)`). User keeps spreadsheet visible.
+
+### Delivery via Telegram
+
+For multi-file bundles (HTML + XLSX + .gs + README):
+
+```python
+# 1. Bundle
+import zipfile
+with zipfile.ZipFile('paket.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+    for f in [html, xlsx, gs, html2, json, md, png]:
+        z.write(f)
+
+# 2. Validate each deliverable runs
+# HTML: chromium headless screenshot
+# XLSX: openpyxl load_workbook then check sheet names + cell values
+# Apps Script: syntax check via Apps Script API or visual review of the .gs file
+
+# 3. Send via Telegram with MEDIA: prefix for each
+# Order: preview screenshot → main file → bundle zip
+```
+
+Telegram message pattern for multi-format:
+```
+💰 JUDUL — 3 VERSI READY
+Preview: MEDIA:/path/screenshot.png
+Files:
+• file1.html (size, role)
+• file2.xlsx (size, role)
+• file3.gs + file3.html (size, role)
+Bundle: MEDIA:/path/paket.zip
+Quick start: 1-2-3 steps
+```
+
+### Decision tree for new dashboard requests
+
+```
+"bikin dashboard / laporan / tracker"
+├─ Single user, personal, offline? → HTML standalone (inlined libs)
+├─ Business user, must edit in Excel? → XLSX (multi-sheet + formulas)
+├─ Team / share / mobile edit? → Apps Script (sidebar)
+└─ No clue / "yang penting jalan"? → Build ALL 3 from one data source
+```
+
+### Common pitfalls
+
+- **Sample data uses Title Case ("Makanan")** but your category dicts use lowercase IDs ("makanan"). Always normalize with `t["kategori"].lower()` before grouping.
+- **openpyxl `merge_cells(f"{col1}{r}:{col2}{r}")` requires column LETTERS, not tuples**. Wrong: `('A','B')`. Right: `get_column_letter(sc) + get_column_letter(ec)`.
+- **openpyxl chart position** is `(row, column, rowOffset, colOffset)` zero-indexed. `setPosition(8, 4, 0, 0)` = anchor at row 8 col 4 (E).
+- **Apps Script HtmlService CDN**: works fine for client libs (Chart.js, Tailwind), but server-side `UrlFetchApp` calls to external APIs need `Apps-Script` user-agent whitelist on target.
+- **Apps Script custom menu disappears** if you don't `addToUi()` at the end of `onOpen()`. Refresh spreadsheet (F5) after deploy.
+- **localStorage namespace collision** between v1 and v2 HTML dashboards — always version the storage key.
+- **Inlined Chart.js makes HTML 1MB+**. That's expected for offline self-contained. Don't try to minify further.
+- **Telegram file upload size**: Bot API limit is 50MB for sendDocument, 10MB for sendPhoto. For >10MB screenshot, send as document not photo.
+
+### See also
+
+- `references/multi-format-dashboard.md` — full code recipes for all 3 formats + sample data structure
+- `templates/dashboard_xlsx.py` — openpyxl multi-sheet workbook with KPI cards + charts + formulas
+- `templates/dashboard_apps_script.gs` — full Apps Script Kode.gs with onOpen menu + setupTemplate + sidebar binding
+- `templates/dashboard_apps_script.html` — HtmlService sidebar dashboard with Chart.js + tabs
+- `templates/dashboard_html_shell.html` — minimal HTML dashboard skeleton with inlined libs pattern
