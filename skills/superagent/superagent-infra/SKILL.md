@@ -938,6 +938,51 @@ sshpass -p 'PASS' ssh -o StrictHostKeyChecking=no root@IP 'chmod +x /root/script
 
 For Python one-liners via SSH: **never embed in ssh command**. Write `.py` file locally, SCP, then `ssh root@IP 'python3 /root/script.py'`.
 
+## Docker Container DNS Resolution (--network host)
+
+**Symptom**: Docker container starts, port binds, but every outbound request (DNS, HTTPS) fails with `EAI_AGAIN`, `ENOTFOUND`, or `fetch failed`. Localhost works. External IPs may or may not work.
+
+**Cause**: Default Docker bridge network uses an internal DNS forwarder at `127.0.0.11` that doesn't work on hosts with systemd-resolved, NetworkManager, or custom MTU.
+
+**Quick fix**:
+```bash
+docker run -d --network host ...  # skip the bridge entirely
+```
+
+**Diagnostic** (always run before adding `--network host` to confirm it's DNS, not firewall):
+```bash
+# 1. DNS test
+docker exec myapp node -e "
+const dns = require('dns');
+dns.lookup('google.com', (e, a) => console.log(e ? 'FAIL: '+e.code : 'OK: '+a));
+"
+
+# 2. IP-direct test (rules out firewall)
+docker exec myapp node -e "
+const https = require('https');
+https.get('https://1.1.1.1', r => console.log('STATUS:', r.statusCode));
+"
+
+# 3. Check container's resolver
+docker exec myapp cat /etc/resolv.conf
+```
+
+**Trade-off of `--network host`**:
+- ✅ Shares host's network namespace, DNS works, simple
+- ❌ `-p` flags ignored (container binds host port directly)
+- ❌ No port isolation between containers
+- ❌ Loses Docker network iptables rules
+- Acceptable for: single-container apps, dev/staging
+- Not acceptable for: multi-tenant production
+
+**Alternative** (if host network too permissive): custom bridge with explicit DNS:
+```bash
+docker network create --driver=bridge --opt "dns=8.8.8.8" --opt "dns=1.1.1.1" mynet
+docker run --network=mynet ...
+```
+
+**Real-world case (OmniRoute 2026-06-18)**: 2 hours wasted debugging before realizing it was DNS. Direct test recipe in `~/.hermes/skills/omniroute/references/docker-network-dns.md`.
+
 ## Systemd Config File Conflict Pitfall
 
 **Symptom:** Service crashes immediately with exit code 1, systemd enters restart loop. `journalctl` shows no useful error — just "Main process exited, code=exited, status=1/FAILURE".

@@ -365,9 +365,23 @@ Quick start: 1-2-3 steps
 - **Inlined Chart.js makes HTML 1MB+**. That's expected for offline self-contained. Don't try to minify further.
 - **Telegram file upload size**: Bot API limit is 50MB for sendDocument, 10MB for sendPhoto. For >10MB screenshot, send as document not photo.
 
+### XLSX production gotchas (must read)
+
+openpyxl + LibreOffice + Excel is a three-tool chain with several hidden failure modes. The full list lives in `references/xlsx-production-pitfalls.md` — load it before any non-trivial XLSX build. Top 5 traps:
+
+1. **LibreOffice recalc round-trip wipes column widths** → bake widths back via direct XML post-processing of the xlsx zip (full code in reference).
+2. **"Circular References" warning is usually a #VALUE!/#DIV/0! false positive**, not a real cycle. Wrap every formula in `IFERROR` and check cached values via LibreOffice recalc.
+3. **VLOOKUP column-index trap** — if data starts at column B (categories), `VLOOKUP(A...;A:C;3)` searches the wrong column and silently returns 0.
+4. **Date column must be `datetime` objects**, not strings — `SUMIFS` returns 0 silently on text dates.
+5. **`IFS()` is not portable** — use nested `IF()` for Excel 2016 / LibreOffice compatibility.
+
+Other production essentials in the reference: per-sheet formatter (borders + zebra + alignment + freeze + total), PDF-page-by-page vision QA, safe row trim without MergedCell errors, total row placement at actual last_data + 1, percentage format `0.0"%"` for value-as-12.3 vs `0.0%` for value-as-0.123.
+
 ### See also
 
 - `references/multi-format-dashboard.md` — full code recipes for all 3 formats + sample data structure
+- `references/xlsx-production-pitfalls.md` — must-read gotchas for openpyxl + LibreOffice + Excel: column width preservation, #VALUE!/#DIV/0! masking as "circular references", VLOOKUP column-index trap, datetime vs string dates, per-sheet formatter, PDF vision QA
+- `scripts/format_xlsx_sheet.py` — reusable per-sheet formatter (`format_data_sheet`, `trim_empty_rows`, `force_widths_xml`, `recalc_via_libreoffice`, `find_last_data_row`, `clear_total_rows`). Import and call instead of rewriting from scratch.
 - `templates/dashboard_xlsx.py` — openpyxl multi-sheet workbook with KPI cards + charts + formulas
 - `templates/dashboard_apps_script.gs` — full Apps Script Kode.gs with onOpen menu + setupTemplate + sidebar binding
 - `templates/dashboard_apps_script.html` — HtmlService sidebar dashboard with Chart.js + tabs

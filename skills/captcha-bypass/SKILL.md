@@ -1,6 +1,6 @@
 ---
 name: captcha-bypass
-description: "Cloudflare bypass + CAPTCHA solver via 2captcha + cloudscraper + playwright. Also covers browser-based form automation (signup, login) from datacenter IPs."
+description: "Cloudflare bypass + CAPTCHA solver via 2captcha + cloudscraper + playwright. Also covers browser-based form automation (signup, login) from datacenter IPs, account enumeration testing on auth endpoints, and Turnstile sitekey-hidden-behind-challenge diagnostics."
 ---
 
 # Web Bypass — CAPTCHA Solving + Cloudflare Bypass + Stealth Browser + Proxy + Form Automation
@@ -446,6 +446,45 @@ Kalo user ga paham teknis:
 | FlareSolverr container exited silently | `docker ps -a | grep flare` → if `Exited (0) 5h ago`, restart: `docker rm flaresolverr && docker run -d --name flaresolverr -p 8191:8191 --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest` |
 | FlareSolverr times out at 60s on first request | First-time CF challenge solve takes 60-90s. Use `curl --max-time 120` (not 60). For ongoing flow, FlareSolverr with `session.id` can persist cookies but also hits the same timeout on hard challenges — fall back to longer timeout, not a different tool. |
 | cf_clearance from FlareSolverr doesn't work in Playwright | See `cf_clearance-binding` pitfall below. **The cookie binds to the exact TLS + browser fingerprint + IP that solved the challenge — it WILL NOT transfer to a different browser instance, even with the same UA and IP.** |
+
+### ⛔ Cloudflare Turnstile Sitekey HIDDEN BEHIND CHALLENGE (verified 2026-06-18, Shopify)
+
+**Different failure mode from "Turnstile lazy validation" above.** When the CF challenge page itself IS the Turnstile widget (i.e. you're not on the app's signup form yet, you're on the "Just a moment..." interstitial), the sitekey is **NOT in the static HTML**. The challenge has to render first before the sitekey appears in the DOM — which is a chicken-and-egg problem for solver APIs.
+
+**Diagnostic signature:**
+- `curl` to signup URL returns 403 with HTML containing `cf-mitigated: challenge` header
+- HTML body has `cf-turnstile` script tag with `/turnstile/v0/b/<SITE_ID>/api.js` but NO `data-sitekey` attribute anywhere
+- Widget div ID is dynamic (`cf-chl-widget-x1jv4` etc.) and doesn't appear until JS executes
+- Even with CloakBrowser (C++ stealth) + `humanize=True` + 30s wait, page stays on "Just a moment..." or shows "Verification successful" hidden div but never reveals the sitekey
+
+**What does NOT work (all verified 2026-06-18, VPS datacenter IP):**
+- ❌ `cloudscraper` → 403 with `cf-mitigated: challenge`
+- ❌ `playwright_stealth` (JS injection) → 403, page won't load
+- ❌ `CloakBrowser` (`launch(headless=True, humanize=True)`) → stuck on "Just a moment..." after 30s wait
+- ❌ `FlareSolverr` (port 8191) → 403 with `ERR_NAME_NOT_RESOLVED` (container DNS broken in this environment)
+- ❌ `YesCaptcha TurnstileTaskProxyless` → cannot extract sitekey to pass as parameter (chicken-and-egg)
+- ❌ `OhMyCaptcha` (self-hosted) → same sitekey extraction problem
+- ❌ Anti-detection Playwright (random user agent, slow_mo, etc.) → 403
+- ❌ Tor exit node rotation → still CF-blocked (sticky circuit, datacenter ASN in CF blocklist)
+
+**The ONLY fixes:**
+1. **Residential proxy** (US/EU residential, $2-5/GB) + CloakBrowser — required for ANY CF-protected signup
+2. **Pivot to non-CF target** — if the goal is authenticated testing, pick a target without CF in front of signup (e.g. Mozilla `accounts.firefox.com` — no CF, email passwordless flow, see `references/email-passwordless-signup.md`)
+3. **Manual signup on user's device** + paste API token to agent — fastest path for one-off targets
+
+**Decision matrix for "should I even try to bypass CF?":**
+
+| Target | CF in front? | Effort | Verdict |
+|---|---|---|---|
+| Shopify signup | ✅ yes | hours, paid proxy | PIVOT |
+| Stripe signup | ✅ yes (Enterprise) | impossible from VPS | PIVOT |
+| Figma signup | ✅ yes | hours, paid proxy | PIVOT |
+| Mozilla Firefox accounts | ❌ no | 5 min, email OTP | ✅ DO IT |
+| Tailscale | ❌ no | 5 min, GitHub OAuth | ✅ DO IT |
+| Replicate | ❌ no | 5 min, GitHub OAuth | ✅ DO IT |
+| Mozilla Developer (MDN) | ❌ no | 5 min, GitHub OAuth | ✅ DO IT |
+
+**Pivoting rule:** when the user says "latihan bug bounty" or "cari target authenticated testing", FIRST check if the candidate is behind CF Turnstile. If yes, skip and try the next. Don't waste 30+ minutes failing on CF bypass when there are dozens of CF-free H1 targets with self-signup.
 
 ### ⚠️ cf_clearance Binding — Why You Can't Transfer FlareSolverr Cookies to Playwright (verified 2026-06-15)
 
