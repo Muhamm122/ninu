@@ -1,7 +1,7 @@
 # Haus Living — Content Progress Tracker
 
-## Current Day: 7
-## Last Updated: 2026-06-18
+## Current Day: 8
+## Last Updated: 2026-06-19
 
 | Hari | Date | Status | Notes |
 |------|------|--------|-------|
@@ -13,3 +13,4 @@
 | 6 | 2026-06-17 | done | Transformasi — Before/After |
 | 7 | 2026-06-18 | done | Lifestyle — Sunday Nook |
 | 8 | 2026-06-19 | scheduled | Edukasi — Material (Solid Wood vs MDF vs Plywood) |
+| 9 | 2026-06-20 | pending | Product — Dining Set |

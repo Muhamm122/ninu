@@ -1023,6 +1023,82 @@ systemctl status <service> --no-pager            # check status
 
 ---
 
+### E. systemd user-level service — runs without sudo
+
+When the user is `ubuntu` (no sudo) but you still want systemd lifecycle management, persistence across SSH logout, and `journalctl` integration — use `systemd-run --user`. Writes to `~/.config/systemd/user/` instead of `/etc/systemd/system/`.
+
+```bash
+# One-shot transient unit (lost on reboot):
+systemd-run --user --unit=halo-proxy \
+  /home/ubuntu/.local/bin/node /home/ubuntu/halo-proxy/server.mjs
+
+# Persistent unit (survives reboot, no sudo):
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/halo-proxy.service <<'EOF'
+[Unit]
+Description=Halo (api.b.ai) Proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/ubuntu/.local/bin/node /home/ubuntu/halo-proxy/server.mjs
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --user daemon-reload
+systemctl --user enable --now halo-proxy
+systemctl --user status halo-proxy
+journalctl --user -u halo-proxy -f
+
+# To make user systemd persist after logout (linger):
+sudo loginctl enable-linger ubuntu    # one-time sudo needed
+```
+
+**Trade-offs vs system-level systemd**:
+- ✅ No sudo needed for create/start/enable/log
+- ✅ Survives SSH disconnect (process keeps running)
+- ❌ Only runs while user is "logged in" — unless `loginctl enable-linger USER` is set
+- ❌ Cannot bind privileged ports (<1024) without extra config
+- Acceptable for: per-user proxies, dev services, agent-side background tasks
+- Not acceptable for: services that must run before user login (e.g. SSH itself)
+
+**Pitfall**: when checking status from another shell session, use `systemctl --user` (not plain `systemctl`) — plain systemctl does not see user units by default.
+
+## Hermes node_modules install quirk (9router, others)
+
+**Symptom**: `systemctl status <service>` shows restart loop with `Error: Cannot find module '/home/ubuntu/.hermes/node/lib/node_modules/<NAME>/cli.js'` — but `ls` shows the directory exists. Inside, the directory is EMPTY. The real install is at a sibling directory named `.<NAME>-<HASH>/`.
+
+**Cause**: `npm install -g` on Hermes sometimes creates a stager dir `.<NAME>-<RANDOM>` and a symlink `<NAME>` → `.<NAME>-<RANDOM>` — but the symlink ends up as an empty directory instead. This is a Hermes-specific npm quirk (related to its custom node install under `~/.hermes/node/`).
+
+**Diagnose**:
+```bash
+ls -la /home/ubuntu/.hermes/node/lib/node_modules/ | grep <NAME>
+# Expect to see TWO entries:
+#   drwxr-xr-x ... <NAME>/            ← empty directory, broken
+#   drwxr-xr-x ... .<NAME>-<HASH>/    ← real install
+```
+
+**Fix** (worked example for 9router):
+```bash
+# 1. Remove broken empty directory
+rm -rf /home/ubuntu/.hermes/node/lib/node_modules/<NAME>
+# 2. Create proper symlink to real install
+ln -s .<NAME>-<HASH> /home/ubuntu/.hermes/node/lib/node_modules/<NAME>
+# 3. Verify
+ls /home/ubuntu/.hermes/node/lib/node_modules/<NAME>/cli.js  # should exist
+node /home/ubuntu/.hermes/node/lib/node_modules/<NAME>/cli.js --version
+# 4. Restart service
+systemctl restart <NAME>   # or: systemctl --user restart <NAME>
+```
+
+**Prevention**: After any Hermes `npm install -g` of a CLI tool, verify the binary path resolves correctly before relying on it. If the install looks empty, apply the symlink fix above immediately.
+
+Confirmed in production for: 9router (real install at `~/.hermes/node/lib/node_modules/.9router-QINSUkdo/`).
+
 ## Node.js CLI Tools with Interactive TUI on Headless VPS
 
 Many Node.js CLI tools (9router, etc.) show an interactive terminal menu. On headless VPS (no TTY, no display), the menu auto-selects "exit" after a timeout, causing the process to die immediately.
