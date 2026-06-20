@@ -57,6 +57,15 @@ generates a new key at https://openrouter.ai/keys.
 |-------|--------|---------|
 | `{"type":"about:blank","title":"Gone","status":410}` | `model_eol` | Model end-of-life | Harus ganti model |
 
+### Hyperbolic
+| Error | Status | Meaning | Action |
+|-------|--------|---------|--------|
+| `{"error":"invalid api key"}` (HTTP 401) | `invalid` | Key dead/expired/typo | Hapus dari pool, minta key baru |
+| HTTP 403 error 1010 (Cloudflare) | `ua_blocked` | User-Agent header missing/wrong | Set `User-Agent: curl/7.88.1` atau browser UA. **Bukan** key invalid! |
+| HTTP 429 | `rate_limited` | Rate limit exceeded | Cooldown 60s, retry |
+| `{"error":"model not found"}` (HTTP 404) | `model_unknown` | Model ID typo atau dihapus | Check `/models` untuk list valid |
+| HTTP 200 with empty content | `ok_empty` | Working, model returned empty (max_tokens too low) | Increase `max_tokens` |
+
 ## Detection Command
 
 ```bash

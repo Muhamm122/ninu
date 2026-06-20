@@ -82,6 +82,7 @@ pip install playwright playwright-stealth
 `~/.hermes/skills/superagent/tools/sctg_solver.py` — SCTG CLI solver
 
 See `references/sctg-solver.md` for full SCTG API docs, pricing, and integration.
+See `references/spotify-login-fingerprint-bound.md` for Spotify auth surface map (verified 2026-06-20): fingerprint-bound reCAPTCHA on email step, deprecated API endpoints, protobuf mobile API, and 4 working alternatives for Premium cookie acquisition.
 See `references/privy-otp-wallet-pitfalls.md` for headless browser OTP input failures, wallet connect limitations, the raw HTTP API workaround, and domain migration detection (e.g. ethra.io → ethraship.com).
 See `references/gmail-oauth-vs-app-password-vps.md` for a detailed failure log of every OAuth approach from VPS and why App Password is the only viable path for personal Gmail.
 See `references/free-captcha-solvers.md` for a curated list of free/open-source captcha solvers (noCaptchaAi 6000/mo, puppeteer-recatcha via wit.ai, FastSolverCaptcha OCR, CaptchaFree Whisper, CapSolver trial).
@@ -452,11 +453,77 @@ https://discord.com/api/oauth2/authorize?client_id=<APP_ID>&redirect_uri=<CALLBA
 ```
 The user clicks Authorize in their already-logged-in browser → server-side OAuth callback completes the airdrop task in 5 seconds. **This is the canonical, fastest path for any airdrop requiring Discord OAuth.** Don't grind on automation.
 
-**For non-airdrop Discord access (when user just needs a Discord session from VPS):** see `references/discord-login-fallback-paths.md` for 3 concrete manual paths (QR code / cookie export / token dump) that bypass cloud-solver entirely. Each path is 30 sec - 2 min and works from VPS without automation. **Always present these as the first option when the user asks for Discord login.**
+**For non-airdrop Discord access (when user just needs a Discord session from VPS):** see `references/discord-login-fallback-paths.md` for 4 concrete paths (QR code / **QR orchestrator via 9proxy+residential** / cookie export / token dump) that bypass cloud-solver entirely. Path A1 (orchestrator) is the only fully-automated option but requires 9proxy residential + CloakBrowser + careful lifecycle management (60-120s QR wait, pkill bug workaround, US-vs-BE geo pitfall). Paths B/C are 30 sec - 2 min and work from VPS without automation. **Always present these as the first option when the user asks for Discord login.** When user explicitly wants agent-driven QR (gives creds + says "gas"), use orchestrator pattern from Path A1.
 
-**Sites known to use fingerprint-bound hCaptcha (always-present OAuth URL to user):**
+**Sites known to use fingerprint-bound hCaptcha / reCAPTCHA (always-present OAuth URL to user):**
 - Discord (sitekey `a9b5fb07-92ff-493f-86fe-352a2803b3df`)
+- **Spotify** (sitekey `6LfCVLAUAAAAALFwwRnnCJ12DalriUGbj8FW_J39`, reCAPTCHA v2 — verified 2026-06-20: triggers on email Continue step, CloakBrowser + SCTG tokens both rejected, workers return `ERROR_CAPTCHA_UNSOLVABLE`). See `references/spotify-login-fingerprint-bound.md` for full failure matrix + 4 working alternatives.
 - Likely Google, Facebook, Apple for sensitive auth flows (verify before grinding)
+
+**Pattern signature (Spotify 2026-06-20):** Even with `$0.15 SCTG balance` + valid `gRecaptchaResponse` token + JS injection to override `grecaptcha.getResponse()`, the form submission returns "Oops! Something went wrong, please try again or check out our help area" — Spotify re-derives the fingerprint hash server-side from the request and rejects mismatch. The endpoint `accounts.spotify.com/api/login` returns 404 (deprecated); `login5.spotify.com/v3/login` requires protobuf encoding (returns binary `0x1002` to form-urlencoded POST). Only Option A (user logs in manually on real device) reliably works.
+
+### ⛔ Discord `remote-auth-gateway.discord.gg` — Cloudflare IP-Block Matrix (verified 2026-06-19/20)
+
+**Different failure mode from the fingerprint-bound hCaptcha above.** Even when password+hCaptcha is bypassed (or you use QR Code Login which bypasses hCaptcha entirely), the **WebSocket endpoint** `wss://remote-auth-gateway.discord.gg/?v=2` is gated by Cloudflare bot management that returns HTTP 403 to most IPs. The QR page renders fine, but the WebSocket handshake fails — `pending_remote_init` never returns a fingerprint, so the QR token can't be generated. This is what blocks the QR orchestrator from connecting, NOT the browser fingerprint.
+
+**Block matrix (verified 2026-06-20, VPS 18.143.107.30 + VPS Mining2 104.207.75.223):**
+
+| Source IP type | Example IP | `discord.com/login` | `remote-auth-gateway` |
+|---|---|---|---|
+| VPS AWS Singapore (datacenter) | `18.143.107.30` | ✅ HTTP 200 | ❌ HTTP 403 |
+| VPS AlmaLinux Namecheap | `104.207.75.223` | ✅ HTTP 200 | ❌ HTTP 403 |
+| 9proxy US (assigned first session) | `69.202.172.165` | ✅ HTTP 200 | ❌ HTTP 403 |
+| 9proxy BE (freshly assigned) | `84.197.178.103` | ✅ HTTP 200 | ✅ **Worked once** → fingerprint `O5CUFYPNi2I...` |
+| 9proxy BE (after one Discord session) | `84.197.178.103` | ✅ HTTP 200 | ❌ HTTP 403 |
+
+**Why even 9proxy (residential) gets burned:** 9proxy uses a "sticky-until-expiry" rotation strategy — the assigned IP stays the same for the whole 1440-min session. Once Cloudflare bot management sees the same IP connecting to `remote-auth-gateway`, it gets flagged and added to the bot block list. **Different geo suffixes (`-country-NL/DE/FR/GB/JP/SG/IN`) all return the same burned IP because they're all on the same session.** Random SSID rotation also fails — see pitfall below.
+
+**The 30-second pre-flight check before launching any Discord QR orchestrator:**
+
+```bash
+# With 9proxy env vars set (or your proxy URL in $PROXY):
+curl -s -o /dev/null -w "%{http_code}" -m 15 -x "$PROXY_URL" \
+  -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36" \
+  "https://remote-auth-gateway.discord.gg/?v=2"
+# 200 → proceed with QR orchestrator
+# 403 → STOP, pivot to fallback (cookie export or session refresh)
+# 000 / connection error → proxy tunnel broken, fix proxy first
+```
+
+**⛔ Random SSID rotation does NOT work on 9proxy — common trap:**
+
+```bash
+# This is a trap (verified 2026-06-20):
+curl -x "http://muham_8J76-ssid-random123:muham@niceproxy.io:17522" https://api.ipify.org
+# Returns: empty / curl exit code 56 (connection error)
+# 9proxy validates the SSID server-side — only the SSID assigned via dashboard works.
+# Sub-session variants like "-1", "-2", "-3" also fail.
+# To get a new SSID you MUST log into https://9proxy.com/dashboard and click "Generate".
+# 9proxy has no public API for session regeneration.
+```
+
+**Refresh options when the assigned session IP is burned (in order of speed):**
+
+| Option | Time | Reliability |
+|---|---|---|
+| User logs into 9proxy dashboard (Google OAuth), generates new session, pastes `username:password:hostname:port` | 3 min | ✅ 95% (gets fresh IP) |
+| User logs into Discord from their own browser, exports cookies via DevTools | 3 min | ✅ 100% |
+| User pastes bot token (if they have one) | 1 min | ✅ 100% (no auth flow needed) |
+| Wait for current 9proxy session to expire (up to 24h) | hours | ✅ eventual but slow |
+| Buy Smartproxy/Webshare paid pool | 15 min | ✅ 90% (different IP pool) |
+
+**Why this matters even with CloakBrowser:** CloakBrowser bypasses JS fingerprint detection, but Cloudflare's IP reputation at the network edge is checked BEFORE any TLS handshake. The browser never gets a chance to prove it's not a bot. Network-level block is fundamentally different from browser-level detection.
+
+**The `halo-proxy` is NOT a fallback:** halo-proxy (Node.js on port 3457) is hardcoded to forward only to `api.b.ai` for Claude Code compatibility — it's not a generic HTTP proxy. Don't waste time trying to use it for Discord or any other site.
+
+**When launching the QR orchestrator, always:**
+1. Run the 30-second pre-flight check above FIRST
+2. If 403 → present the refresh options table to user, do NOT auto-retry
+3. If 200 → run one cycle, monitor for fingerprint in 60s
+4. If fingerprint is null after 60s, the IP is partially burned (Cloudflare lets HTTP through but blocks WS handshake) — kill and stop, don't keep retrying
+5. Send the QR to user IMMEDIATELY on success (5-min expiry, no buffer)
+
+See `references/discord-login-fallback-paths.md` for the full QR orchestrator code + lifecycle patterns.
 
 **Sites known to use lazy hCaptcha (try the Turnstile probe ladder first — see the dedicated section):**
 - Most WordPress sites
@@ -528,7 +595,8 @@ Kalo user ga paham teknis:
 | `400 Bad Request` on Google form POST | Use browser automation instead of cloudscraper for form submission |
 | Username taken | Try variations with numbers/suffixes |
 | SCTG `ERROR_ZERO_BALANCE` | Top up at sctg.xyz (via bot or support) |
-| SCTG balance negative | Same — needs top up before solving |
+| SCTG `ERROR_WRONG_CAPTCHA_ID` | Wrong endpoint — `api.sctg.xyz/res.php?action=submitcaptcha` returns this. Correct endpoint is `sctg.xyz/in.php` (NOT `api.sctg.xyz`). Submit via `POST https://sctg.xyz/in.php` with form data `key`, `method=userrecaptcha`, `googlekey`, `pageurl`, then poll `GET https://sctg.xyz/res.php?key=KEY&action=get&id=CAPTCHA_ID` |
+| SCTG `ERROR_CAPTCHA_UNSOLVABLE` (after `CAPCHA_NOT_READY` polling) | Workers couldn't solve — target is likely fingerprint-bound (Discord class) OR captcha is hidden/anti-bot. Don't retry; present fallback paths to user |
 | FlareSolverr container exited silently | `docker ps -a | grep flare` → if `Exited (0) 5h ago`, restart: `docker rm flaresolverr && docker run -d --name flaresolverr -p 8191:8191 --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest` |
 | FlareSolverr times out at 60s on first request | First-time CF challenge solve takes 60-90s. Use `curl --max-time 120` (not 60). For ongoing flow, FlareSolverr with `session.id` can persist cookies but also hits the same timeout on hard challenges — fall back to longer timeout, not a different tool. |
 | cf_clearance from FlareSolverr doesn't work in Playwright | See `cf_clearance-binding` pitfall below. **The cookie binds to the exact TLS + browser fingerprint + IP that solved the challenge — it WILL NOT transfer to a different browser instance, even with the same UA and IP.** |
