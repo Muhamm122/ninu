@@ -148,7 +148,39 @@ const API_KEY = "your_wit_ai_key";  // Free from https://wit.ai
 
 ---
 
-## 6. CapSolver — $0.50 Free Trial (Paid API, Best Coverage)
+## 7. Nopecha — Free Extension + Paid API (Verified 2026-06-25)
+
+- **URL**: https://nopecha.com
+- **Free tier**: 100 solves/day (browser extension only — Chrome/Edge)
+- **Paid**: ~$9/3 months for API access
+- **API base**: `https://api.nopecha.com`
+
+### Key Discovery: Dual API Behavior
+
+Nopecha has TWO different API endpoints with different IP policies:
+
+| Endpoint | VPS Datacenter IP | Residential IP | Tor |
+|----------|-------------------|----------------|-----|
+| `GET /status?key=KEY` | ✅ Works — returns balance | ✅ Works | ✅ Works |
+| `GET /v1/status` | ❌ `{"error":12,"message":"Banned IP"}` | ❌ Banned | ❌ Banned |
+| Solve endpoints | ❌ Blocked | ❌ Blocked | ❌ Blocked |
+
+### Balance Check (Works from VPS)
+```bash
+curl -s "https://api.nopecha.com/status?key=YOUR_KEY"
+# Returns: {"plan":"Starter","status":"Active","credit":1843,"quota":2000,...}
+```
+
+### Subscription Keys vs API Keys
+- **Subscription keys** (format: `sub_1T...`) — these are subscription identifiers, NOT API keys
+- **API keys** — generated from Nopecha dashboard, used for solve endpoints
+- Free extension keys work for browser-based solving only
+
+### When to Use Nopecha
+- ✅ User has Chrome/Edge extension installed (free 100/day)
+- ✅ Balance check from VPS (status endpoint works)
+- ❌ Solve API from VPS datacenter IP (blocked)
+- ❌ Not a replacement for SCTG/YesCaptcha from VPS
 
 - **URL**: https://capsolver.com
 - **Free trial**: $0.50 via livechat (ask for trial)

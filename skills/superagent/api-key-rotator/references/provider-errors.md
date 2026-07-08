@@ -46,6 +46,13 @@ generates a new key at https://openrouter.ai/keys.
 | `{"error":{"message":"User not found","code":401}}` | `invalid` | Key expired/tidak terdaftar |
 | `{"error":{"message":"Missing Authentication header","code":401}}` | `config_error` | Header tidak ter-set |
 
+### Conduit
+| Error | Status | Meaning | Action |
+|-------|--------|---------|--------|
+| HTTP 200 with body `"The response did not generate correctly"` | `broken_upstream` | Conduit accepted request but upstream vendor failed | Avoid this model — use `mistral-large-3`, `gpt-4.1`, or `gpt-4o` |
+| 429 `Free plan rate limit reached` | `rate_limited` | Free plan quota exceeded | Wait 30-60s, space requests |
+| HTTP 200 with empty/null content | `ok_empty` | Working but returned empty (max_tokens too low) | Increase `max_tokens` |
+
 ### MiMo (Xiaomi)
 | Error | Status | Meaning |
 |-------|--------|---------|
@@ -57,11 +64,13 @@ generates a new key at https://openrouter.ai/keys.
 |-------|--------|---------|
 | `{"type":"about:blank","title":"Gone","status":410}` | `model_eol` | Model end-of-life | Harus ganti model |
 
-### Hyperbolic
+### b.ai
 | Error | Status | Meaning | Action |
 |-------|--------|---------|--------|
-| `{"error":"invalid api key"}` (HTTP 401) | `invalid` | Key dead/expired/typo | Hapus dari pool, minta key baru |
-| HTTP 403 error 1010 (Cloudflare) | `ua_blocked` | User-Agent header missing/wrong | Set `User-Agent: curl/7.88.1` atau browser UA. **Bukan** key invalid! |
+| `{"error":"invalid api key"}` (HTTP 401) | `invalid` | Key dead/expired | Remove from pool, get new key |
+| HTTP 429 | `rate_limited` | Rate limit exceeded | Cooldown 60s |
+| HTTP 520 (Cloudflare) | `server_error` | b.ai server issue, OR datacenter IP blocked | Try via residential proxy or wait |
+| HTTP 502/503 | `server_error` | b.ai origin server down | Wait for recovery |
 | HTTP 429 | `rate_limited` | Rate limit exceeded | Cooldown 60s, retry |
 | `{"error":"model not found"}` (HTTP 404) | `model_unknown` | Model ID typo atau dihapus | Check `/models` untuk list valid |
 | HTTP 200 with empty content | `ok_empty` | Working, model returned empty (max_tokens too low) | Increase `max_tokens` |

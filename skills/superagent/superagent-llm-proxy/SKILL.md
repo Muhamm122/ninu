@@ -505,3 +505,17 @@ See `references/pitfalls.md` for extended troubleshooting.
 ## Blocking Pattern — Move On Quickly
 
 When blocked (missing creds, IP block, expired keys) and user told twice: **stop asking, offer alternative, move on**. User frustration signals ("oke tinggalkan", "lupakan") = drop immediately. Do NOT repeat the blocker.
+
+## Provider Registration Blockers
+
+Some providers require auth flows that cannot be completed from a headless VPS. See `references/provider-registration-blockers.md` for the full catalog.
+
+**Quick reference:**
+| Blocker | Affected Providers | Workaround |
+|---------|-------------------|------------|
+| Alibaba Cloud SSO | Qwen Cloud, DashScope | Register from local browser + phone |
+| Clerk Auth | Cambrian, many Web3 startups | Register from local browser |
+| Discord OAuth | Airdrop/gaming platforms | Connect from local browser |
+| hCaptcha/Turnstile | NVIDIA NIM, Cloudflare signups | User registers from own device |
+
+**Decision rule**: If 2+ attempts fail within 5 minutes, report blocker to user with alternatives. Don't grind on VPS-impossible registrations.

@@ -704,6 +704,102 @@ ssh ubuntu@NEW_IP "tar -xzf archive.tar.gz && bash haus-backup-*/restore.sh"
 
 See `references/hermes-miniapp-deploy.md` for deploying React+Vite+Express Telegram Mini Apps behind nginx subpath.
 See `references/juno-cash-mining.md` for Juno Cash mining setup, pitfalls, and Telegram monitoring.
+See `references/yahoo-finance-api-v8.md` for Yahoo Finance API v8 proxy pattern, IDX tickers, derived metrics (RSI/MACD/BB), and Nginx CORS bypass.
+
+## Nginx Reverse Proxy to Third-Party API (CORS Bypass Pattern)
+
+When a frontend app needs to call a third-party API that blocks CORS (Yahoo Finance, Google APIs, etc.), proxy through Nginx on the VPS:
+
+```nginx
+# /etc/nginx/sites-available/your-config
+location /api/yahoo/ {
+    rewrite ^/api/yalm/(.*) /$1 break;
+    proxy_pass https://query1.finance.yahoo.com/;
+    proxy_http_version 1.1;
+    proxy_set_header Host query1.finance.yahoo.com;
+    proxy_set_header User-Agent "Mozilla/5.0";
+    proxy_ssl_server_name on;
+    proxy_set_header X-Real-IP $remote_addr;
+    # Cache to reduce rate-limit hits
+    proxy_cache_path /tmp/yahoo_cache levels=1:2 keys_zone=yahoo:10m max_size=50m inactive=5m;
+    proxy_cache yahoo;
+    proxy_cache_valid 200 5m;
+    add_header X-Cache-Status $upstream_cache_status;
+}
+```
+
+**Frontend JS**:
+```javascript
+const API = '/api/yahoo/v8/finance/chart/';
+async function get(ticker) {
+  const r = await fetch(API + ticker + '.JK?range=6mo&interval=1d');
+  const d = await r.json();
+  const q = d.chart.result[0];
+  return {
+    price: q.indicators.quote[0].close.filter(x => x).pop(),
+    closes: q.indicators.quote[0].close.filter(x => x),
+    highs: q.indicators.quote[0].high.filter(x => x),
+    lows: q.indicators.quote[0].low.filter(x => x)
+  };
+}
+```
+
+**Key facts**:
+- Browser → third-party API fails (CORS). VPS → third-party API works (server-to-server, no CORS)
+- IDX tickers need `.JK` suffix (BBRI.JK, BMRI.JK). Global: `^JKSE`, `^GSPC`, `GC=F`, `USDIDR=X`
+- Yahoo v8 chart endpoint: `.../v8/finance/chart/<T>?range=6mo&interval=1d`
+
+## Building & Deploying SPAs on VPS (HTML + JS Dashboard)
+
+When building full dashboards on a VPS:
+
+**File structure**:
+```
+/home/ubuntu/stock-dashboard/
+├── index.html      (entry point, references app.js)
+└── app.js          (all logic, data fetching, rendering)
+```
+
+**Writing large JS files** — heredoc breaks on nested quotes/emoji/template-literal:
+```bash
+# BAD: heredoc with complex JS (nested quotes break)
+cat > app.js << 'EOF'
+  ...complex JS...  ← breaks on backticks, ${}, emoji
+EOF
+
+# GOOD: write via Python string concatenation
+cat > /tmp/build.py << 'PYEOF'
+js = '''const x = `template ${val}`;'''
+with open('app.js','w') as f: f.write(js)
+PYEOF
+python3 /tmp/build.py
+
+# GOOD: write in parts via heredoc, concatenate
+cat > p1.js << 'EOF'
+const API = '...';
+function init() { ... }
+EOF
+cat > p2.js << 'EOF'
+function loadData() { ... }
+EOF
+cat p1.js p2.js > app.js
+```
+
+**Verification before deploy**:
+```bash
+node -c app.js  # JS syntax check
+# HTML check via python html.parser
+```
+
+**Nginx config for SPA**:
+```nginx
+server {
+    root /home/ubuntu/stock-dashboard;
+    index index.html;
+    location / { try_files $uri $uri/ /index.html; }
+    location /api/yalm/ { ... proxy ... }
+}
+```
 
 ---
 
@@ -731,7 +827,9 @@ sshpass -p 'PASSWORD' ssh root@REMOTE_IP 'chmod +x /usr/local/bin/my-script'
 **Alternative**: Use Python's paramiko with SFTP for programmatic remote writes.
 See `references/9router-integration.md` for 9Router setup, config location, and key management.
 See `references/hermes-miniapp-deploy.md` for deploying React+Vite+Express Telegram Mini Apps behind nginx subpath.
-See `references/9router-db-reference.md` for 9Router SQLite DB schema, queries, and key management rules.
+See `references/9router-db-reference.md` for 9Router SQLite DB schema, queries, auth reset, and key management rules.
+See `references/9router-web-ui.md` for deploying the 9router Next.js web dashboard (standalone server, auth, nginx proxy, DNS setup).
+See `references/9router-web-ui.md` for 9Router standalone web UI deployment, auth system, nginx proxy, and pitfalls.
 See `references/vps-backup-restore.md` for full script templates.
 See `references/freellmapi-key-management.md` for adding API keys, version checks, and fallback chain details.
 See `references/paramiko-remote-ops.md` for password-based SSH from the agent (when sshpass/heredoc fails for multi-line files), daemon-background patterns, and SFTP file transfer.
@@ -937,6 +1035,39 @@ sshpass -p 'PASS' ssh -o StrictHostKeyChecking=no root@IP 'chmod +x /root/script
 ```
 
 For Python one-liners via SSH: **never embed in ssh command**. Write `.py` file locally, SCP, then `ssh root@IP 'python3 /root/script.py'`.
+
+## Next.js App Under Nginx Subpath — Redirect Chain Fix
+
+Next.js apps (9router dashboard, OmniRoute, or any standalone Next.js) redirect internally using server-relative paths (`/dashboard`, `/login`). When proxied under a subpath like `/9router/`, these redirects lose the prefix and cause 404.
+
+**Symptom**: `curl -sI http://VPS/9router/` returns `307 Location: /dashboard` instead of `/9router/dashboard`. Following the redirect gives 404 because `/dashboard` has no nginx location.
+
+**Why `proxy_redirect` doesn't fix it**: Next.js returns `Location: /dashboard` (no host origin). `proxy_redirect` only matches Location headers containing the upstream origin (`http://127.0.0.1:3000/...`).
+
+**Fix — intercept locations**:
+```nginx
+# Catch un-prefixed Next.js redirects and rewrite under the proxy prefix
+location = /dashboard { return 301 /9router/dashboard; }
+location = /login    { return 301 /9router/login; }
+
+# Main proxy
+location /9router/ {
+    proxy_pass http://127.0.0.1:3000/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 90s;
+    proxy_buffering off;
+}
+```
+
+**Result**: `/9router/` → 307 `/dashboard` → 301 `/9router/dashboard` → 307 `/login` → 301 `/9router/login` → 200 OK. Browsers handle the chain in ~50ms.
+
+**Applies to**: Any Next.js standalone app proxied under a subpath. Always add intercept locations for every route the app redirects to.
 
 ## Docker Container DNS Resolution (--network host)
 
@@ -1387,18 +1518,21 @@ On some VPS setups (especially those created by AI agents or non-standard provis
 
 **Consequence**: Editing `sites-available/myapp` does NOT affect `sites-enabled/myapp`. Both must be independently edited.
 
+**Also**: The active catch-all config may NOT be `default`. Always check `ls /etc/nginx/sites-enabled/` first — on this VPS it's `haus-living`, not `default`. Writing to `sites-available/default` does nothing.
+
 **Diagnose**:
 ```bash
-# Check if sites-enabled is a symlink
-ls -la /etc/nginx/sites-enabled/myapp
-# If it shows a regular file (not "-> ../sites-available/myapp"), it's a copy
+# Check which configs are actually active
+ls -la /etc/nginx/sites-enabled/
+# Verify which one is the catch-all (has default_server)
+grep -l "default_server" /etc/nginx/sites-enabled/*
 ```
 
 **Fix when removing a config block**:
 ```bash
 # Must edit BOTH files
-sudo sed -i '/location \\/download\\//,/^    }/d' /etc/nginx/sites-available/myapp
-sudo sed -i '/location \\/download\\//,/^    }/d' /etc/nginx/sites-enabled/myapp
+sudo sed -i '/location \\/download\\\\//,/^    }/d' /etc/nginx/sites-available/myapp
+sudo sed -i '/location \\/download\\\\//,/^    }/d' /etc/nginx/sites-enabled/myapp
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -1569,6 +1703,55 @@ Then transfer via `scp`. Alternatively, avoid emoji entirely in bash string lite
 
 **Also:** `write_file` auto-masks secrets (API tokens, passwords → `***`). Scripts requiring tokens must have them set directly by the user via SSH or read from environment variables on the target machine.
 
+## 9Router Standalone Web UI
+
+9router ships a **Next.js 16 standalone dashboard** (providers, connections, usage, settings). Separate from the CLI tray process.
+
+### Quick start
+```bash
+cd ~/.hermes/node/lib/node_modules/.9router-QINSUkdo/app
+PORT=3000 node server.js   # → http://localhost:3000
+```
+
+### Auth
+- **Mode**: `password` (default) or `oidc` — check via `GET /api/auth/status`
+- **Default password**: `123456` (only when no bcrypt hash in DB settings, or set `INITIAL_PASSWORD` env)
+- **Login**: `POST /api/auth/login` with `{"password":"..."}`
+- **Rate limit**: 5 fails → lockout (30s→120s→600s→1800s escalation, in-memory, resets on restart)
+- **Reset password**: `9router settings reset password` or update bcrypt hash in `settings` table directly
+
+### Nginx proxy
+```nginx
+location /9router/ {
+    proxy_pass http://127.0.0.1:3000/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+**Pitfall**: Next.js auth redirects may break under subpath proxy — if 307 loop, use subdomain or set `NEXT_PUBLIC_BASE_URL`.
+
+### Systemd
+```ini
+[Unit]
+Description=9Router Web UI
+After=network.target
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/.hermes/node/lib/node_modules/.9router-QINSUkdo/app
+ExecStart=/home/ubuntu/.local/bin/node server.js
+Environment=PORT=3000
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+```
+
+See `references/9router-web-ui.md` for full details (auth endpoints, dashboard pages, password reset via DB, pitfalls).
+
 ## Juno Cash Pool Mining — NOT VIABLE (2026-06-13)
 
 **Pool:** `juno.suprnova.cc:8383` — supports XMRig/SRBMiner but Juno Cash is incompatible.
@@ -1696,4 +1879,82 @@ When user asks to "cek vps terbaru":
 - **NEVER use sshpass + heredoc for multi-line remote file writes** — nested quoting always breaks. Write locally → SCP, or use base64, or Python heredoc on remote.
 
 See `references/juno-cash-mining.md` for Juno Cash (JUNO) Zcash-fork mining setup — install path (Ubuntu + AlmaLinux), paramiko daemon-start hang fix, seed node config for slow peer discovery, junocashd config pitfalls, solo mining, wallet generation, pool mining via JunoPool, node corruption/reindex fix, and Telegram monitoring. Pair with `templates/junocashd.{service,conf}` and `scripts/{install_junocashd_remote,check_juno_sync}.py` for full deploy + status workflow.
+
+## 9Router Standalone Web UI Deployment
+
+9router bundles a Next.js 16 web dashboard that can run independently from the CLI tray mode. Use this when the user wants a browser-manageable UI for providers, connections, usage stats, and API key CRUD.
+
+### Start the web UI
+
+```bash
+# The app lives inside the 9router install (symlinked or direct path)
+APP_DIR=$(readlink -f /home/ubuntu/.hermes/node/lib/node_modules/9router 2>/dev/null \
+  || echo "/home/ubuntu/.hermes/node/lib/node_modules/.9router-QINSUkdo/app")
+
+# Start as background process (port defaults to 3000 via PORT env var)
+PORT=3000 node $APP_DIR/server.js > /tmp/9router-web.log 2>&1 &
+# Or via systemd/pm2 for persistence
+```
+
+### Auth — Password Reset via SQLite
+
+9router uses bcrypt-hashed passwords in the `settings` table (NOT `providerConnections`). Schema: `id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL`.
+
+```bash
+# Generate new bcrypt hash
+python3 -c "import bcrypt; print(bcrypt.hashpw(b'NEW_PASSWORD', bcrypt.gensalt(10)).decode())"
+
+# Update in DB
+sqlite3 ~/.9router/db/data.sqlite "UPDATE settings SET data='{\"password\": \"\$2b\$10\$NEW_HASH_HERE\"}' WHERE id=1"
+
+# Default password (when no hash in DB): process.env.INITIAL_PASSWORD || "123456"
+```
+
+**Auth status endpoint:** `GET /api/auth/status` → JSON with `requireLogin`, `authMode` ("password" or "oidc"), `hasPassword`.
+
+**Login endpoint:** `POST /api/auth/login` with `{"password":"..."}` → `{"success":true}` + `auth_token` cookie (HS256 JWT, 24h expiry).
+
+**Rate limiting:** 5 failed attempts → lockout with exponential backoff (30s, 2m, 10m, 30m).
+
+### Nginx Reverse Proxy (subpath)
+
+```nginx
+location /9router/ {
+    proxy_pass http://127.0.0.1:3000/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 90s;
+    proxy_buffering off;
+}
+```
+
+**Pitfall — Next.js subpath redirect strips prefix:** When deployed under a subpath like `/9router/`, Next.js 307 redirects go to `/dashboard` instead of `/9router/dashboard`. Fix: set `NEXT_PUBLIC_BASE_URL` or `basePath` in Next.js config to `/9router`, or tell users to access `/9router/login` or `/9router/dashboard` directly instead of the bare subpath root.
+
+**Pitfall — `haus-living` nginx config is the active one:** On this VPS, `/etc/nginx/sites-enabled/` has `haus-living` (NOT `default`). Always add location blocks to the `haus-living` file. Editing `sites-available/default` has no effect.
+
+### Key 9router Web UI Routes
+
+| Route | Description |
+|---|---|
+| `/login` | Password/OIDC login page |
+| `/dashboard` | Main dashboard (providers, stats) |
+| `/dashboard/settings/pricing` | Pricing config |
+| `/dashboard/endpoint` | API endpoint info |
+| `/dashboard/usage` | Usage charts |
+| `/dashboard/cli-tools` | CLI tool downloads |
+| `/api/auth/status` | Auth state JSON |
+| `/api/auth/login` | POST login |
+| `/api/auth/logout` | POST logout |
+| `/api/v1/*` | 9router LLM proxy API |
+
+See `references/9router-web-ui.md` for full setup recipe including DB schema, auth internals, and the dewabiz DNS API pattern.
+
+See `references/9router-web-ui-deploy.md` for **9Router standalone web UI deployment** — Next.js 16 standalone server start command, auth system (password/OIDC), bcrypt password reset via SQLite, nginx reverse proxy (path-prefix vs subdomain), auth endpoints, and 6 key pitfalls (root-path redirect stripping prefix, npm global install symlink quirk, better-sqlite3 native binary, bcrypt-only passwords, missing CLI password reset, auth cookie HTTPS config).
 See `references/npm-global-clis-on-hermes.md` for the npm global install path quirk on Hermes-managed boxes (binaries land in `~/.hermes/node/bin/`, NOT `/usr/local/bin/`), PATH export pattern, and @kapso/cli auth pitfalls (interactive login + `KAPSO_API_KEY` env var for non-interactive).
+See `references/multi-repo-batch-deploy.md` for the **5-step pattern for deploying N GitHub repos as PM2 services on a single Hermes VPS** — inventory first, port-collision detection, orphan-process adoption, pm2 binary path (`~/.hermes/node/bin/pm2` not venv), pip-in-venv gotcha, Vite `dist/` 404 trap, empty CNAME-only repo detection, port allocation strategy, and worked example with 6 waguriagentic repos.
+See `references/hermes-config-proxy-persistence.md` for the proxy config pattern — `patch` is blocked for config.yaml, use `hermes config set` instead. Covers 3-layer persistence (config.yaml + proxy.env + proxy_providers.json).

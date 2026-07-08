@@ -36,6 +36,7 @@ What's in the box:
   and read `chrome.storage`.
 - **dApp/wallet plumbing** — WalletConnect URI capture + `governed_sign`
   (screen → governor → confirm → sign). A page can request a tx; the agent decides.
+  **Pitfall:** Injecting `window.ethereum` does NOT work for dApps using WalletConnect/Web3Modal SDK (Forge, Aave, Compound, etc.). The SDK opens extension popups or QR modals that headless Chromium cannot service. Clicking "MetaMask"/"Browser Wallet" shows "Opening... Confirm in extension" then hangs. Solution: use Extension Controller to install MetaMask, or have user connect from local browser and paste session.
 
 ## Files
 
